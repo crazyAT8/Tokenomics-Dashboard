@@ -24,8 +24,10 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
   const fetchCoins = async (query: string = '') => {
     setIsLoading(true);
     try {
+      console.log('CoinSelector - fetching coins with query:', query);
       const response = await fetch(`/api/coins/search?q=${encodeURIComponent(query)}&limit=20`);
       const data = await response.json();
+      console.log('CoinSelector - received data:', Array.isArray(data) ? data.length : 'not an array', data);
       setCoins(data);
     } catch (error) {
       console.error('Error fetching coins:', error);

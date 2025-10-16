@@ -2,10 +2,14 @@ import axios from 'axios';
 import { CoinData, PriceHistory } from './types';
 
 const COINGECKO_API_URL = process.env.COINGECKO_API_URL || 'https://api.coingecko.com/api/v3';
+const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY;
 
 const api = axios.create({
   baseURL: COINGECKO_API_URL,
   timeout: 10000,
+  headers: COINGECKO_API_KEY ? {
+    'x-cg-pro-api-key': COINGECKO_API_KEY
+  } : {},
 });
 
 export const fetchCoinData = async (coinId: string): Promise<CoinData> => {

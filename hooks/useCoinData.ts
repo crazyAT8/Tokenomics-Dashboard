@@ -22,6 +22,7 @@ export const useCoinData = () => {
     setError(null);
 
     try {
+      console.log('Fetching data for coin:', selectedCoin, typeof selectedCoin);
       const response = await fetch(`/api/coins/${selectedCoin}?days=7`);
       
       if (!response.ok) {
@@ -29,9 +30,11 @@ export const useCoinData = () => {
       }
 
       const data = await response.json();
+      console.log('Received data:', data);
       setMarketData(data);
       updateLastUpdated();
     } catch (err) {
+      console.error('Error fetching coin data:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);

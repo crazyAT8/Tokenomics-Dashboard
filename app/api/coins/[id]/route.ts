@@ -7,6 +7,7 @@ export async function GET(
 ) {
   try {
     const coinId = params.id;
+    console.log('API Route - coinId:', coinId, typeof coinId);
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '7');
 
