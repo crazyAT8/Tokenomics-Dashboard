@@ -19,6 +19,7 @@ module.exports = {
           700: '#1d4ed8',
           800: '#1e40af',
           900: '#1e3a8a',
+          950: '#172554',
         },
         crypto: {
           green: '#00d4aa',
@@ -32,5 +33,13 @@ module.exports = {
       }
     },
   },
+  safelist: [
+    'text-crypto-green',
+    'text-crypto-red',
+    'bg-crypto-green',
+    'bg-crypto-red',
+    'border-crypto-green',
+    'border-crypto-red',
+  ],
   plugins: [],
 }
