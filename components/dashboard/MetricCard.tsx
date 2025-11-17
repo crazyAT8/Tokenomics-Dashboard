@@ -54,12 +54,12 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow duration-200">
-      <CardContent className="p-6">
+    <Card className="hover:shadow-md active:shadow-sm transition-all duration-200 touch-manipulation">
+      <CardContent className="p-4 sm:p-5 lg:p-6">
         <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
-            <p className="text-2xl font-bold text-gray-900 mb-1">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">{title}</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 break-words">
               {formatValue(value)}
             </p>
             {subtitle && (
@@ -67,7 +67,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
             )}
           </div>
           {icon && (
-            <div className="ml-4 text-primary-500">
+            <div className="ml-3 sm:ml-4 text-primary-500 flex-shrink-0">
               {icon}
             </div>
           )}
@@ -75,7 +75,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         {change !== undefined && (
           <div className={`flex items-center mt-2 ${getChangeColor()}`}>
             {getChangeIcon()}
-            <span className="ml-1 text-sm font-medium">
+            <span className="ml-1 text-xs sm:text-sm font-medium">
               {change > 0 ? '+' : ''}{change.toFixed(2)}%
             </span>
           </div>

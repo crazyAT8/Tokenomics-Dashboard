@@ -67,18 +67,18 @@ export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {metrics.map((metric, index) => (
-          <Card key={index} className="hover:shadow-md transition-shadow duration-200">
-            <CardContent className="p-4">
+          <Card key={index} className="hover:shadow-md active:shadow-sm transition-all duration-200 touch-manipulation">
+            <CardContent className="p-4 sm:p-5">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">
                     {metric.title}
                   </p>
-                  <p className="text-xl font-bold text-gray-900">
+                  <p className="text-lg sm:text-xl font-bold text-gray-900 break-words">
                     {typeof metric.value === 'number' 
                       ? formatNumber(metric.value) 
                       : metric.value
@@ -90,7 +90,7 @@ export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
                     </p>
                   )}
                 </div>
-                <div className="text-primary-500">
+                <div className="text-primary-500 ml-3 flex-shrink-0">
                   {metric.icon}
                 </div>
               </div>
@@ -98,7 +98,7 @@ export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
                 <div className={`flex items-center mt-2 ${
                   metric.change >= 0 ? 'text-crypto-green' : 'text-crypto-red'
                 }`}>
-                  <span className="text-sm font-medium">
+                  <span className="text-xs sm:text-sm font-medium">
                     {metric.change >= 0 ? '+' : ''}{metric.change.toFixed(2)}%
                   </span>
                 </div>
@@ -110,10 +110,10 @@ export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
 
       {/* Supply Distribution Chart */}
       <Card>
-        <CardHeader>
-          <CardTitle>Supply Distribution</CardTitle>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">Supply Distribution</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-2 sm:p-4 lg:p-6">
           <TokenomicsChart data={tokenomics} />
         </CardContent>
       </Card>

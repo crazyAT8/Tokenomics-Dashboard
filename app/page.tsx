@@ -43,11 +43,11 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="max-w-md mx-auto">
-          <CardContent className="p-6 text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <Card className="max-w-md w-full mx-auto">
+          <CardContent className="p-4 sm:p-6 text-center">
+            <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
               {displayErrorDetails?.isNetworkError 
                 ? 'Connection Error' 
                 : displayErrorDetails?.isTimeoutError
@@ -56,9 +56,9 @@ export default function Dashboard() {
                 ? 'Rate Limit Exceeded'
                 : 'Error Loading Data'}
             </h2>
-            <p className="text-gray-600 mb-2">{error}</p>
+            <p className="text-sm sm:text-base text-gray-600 mb-2 break-words">{error}</p>
             {displayErrorDetails && (
-              <div className="text-sm text-gray-500 mb-4">
+              <div className="text-xs sm:text-sm text-gray-500 mb-4">
                 {displayErrorDetails.isNetworkError && (
                   <p>Please check your internet connection.</p>
                 )}
@@ -84,7 +84,7 @@ export default function Dashboard() {
               <button
                 onClick={refreshData}
                 disabled={networkStatus && !networkStatus.isOnline}
-                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2 touch-manipulation active:scale-[0.98]"
               >
                 <RefreshCw className="h-4 w-4" />
                 <span>Try Again</span>
@@ -105,9 +105,9 @@ export default function Dashboard() {
         networkStatus={networkStatus}
       />
       
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Coin Selector */}
-        <div className="mb-8">
+        <div className="mb-4 sm:mb-6 lg:mb-8">
           <CoinSelector
             selectedCoin={selectedCoin}
             onCoinSelect={setSelectedCoin}
@@ -124,26 +124,26 @@ export default function Dashboard() {
         ) : marketData ? (
           <>
             {/* Price Overview */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              <div className="lg:col-span-2">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+              <div className="lg:col-span-2 order-1">
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
+                  <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="flex items-center text-base sm:text-lg">
                       <img
                         src={marketData.coin.image}
                         alt={marketData.coin.name}
-                        className="w-8 h-8 mr-3 rounded-full"
+                        className="w-6 h-6 sm:w-8 sm:h-8 mr-2 sm:mr-3 rounded-full flex-shrink-0"
                       />
-                      {marketData.coin.name} Price Chart
+                      <span className="truncate">{marketData.coin.name} Price Chart</span>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-2 sm:p-4 lg:p-6">
                     <PriceChart data={marketData.priceHistory} />
                   </CardContent>
                 </Card>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4 order-2">
                 <MetricCard
                   title="Current Price"
                   value={marketData.coin.current_price}
@@ -181,7 +181,9 @@ export default function Dashboard() {
             </div>
 
             {/* Tokenomics Overview */}
-            <TokenomicsOverview tokenomics={marketData.tokenomics} />
+            <div className="order-3">
+              <TokenomicsOverview tokenomics={marketData.tokenomics} />
+            </div>
           </>
         ) : null}
       </main>

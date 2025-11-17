@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { TokenomicsData } from '@/lib/types';
 
@@ -50,8 +50,33 @@ export const TokenomicsChart: React.FC<TokenomicsChartProps> = ({ data }) => {
     return null;
   };
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [chartHeight, setChartHeight] = useState(320);
+  const [outerRadius, setOuterRadius] = useState(80);
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      const mobile = window.innerWidth < 640;
+      setIsMobile(mobile);
+      if (mobile) {
+        setChartHeight(250);
+        setOuterRadius(60);
+      } else if (window.innerWidth < 1024) {
+        setChartHeight(300);
+        setOuterRadius(70);
+      } else {
+        setChartHeight(320);
+        setOuterRadius(80);
+      }
+    };
+
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, []);
+
   return (
-    <div className="w-full h-80">
+    <div className="w-full" style={{ height: `${chartHeight}px` }}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -59,8 +84,13 @@ export const TokenomicsChart: React.FC<TokenomicsChartProps> = ({ data }) => {
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
-            outerRadius={80}
+            label={({ name, percentage }) => {
+              if (isMobile) {
+                return `${percentage.toFixed(1)}%`;
+              }
+              return `${name}: ${percentage.toFixed(1)}%`;
+            }}
+            outerRadius={outerRadius}
             fill="#8884d8"
             dataKey="value"
           >
@@ -68,7 +98,12 @@ export const TokenomicsChart: React.FC<TokenomicsChartProps> = ({ data }) => {
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip 
+            content={<CustomTooltip />}
+            wrapperStyle={{
+              zIndex: 1000,
+            }}
+          />
         </PieChart>
       </ResponsiveContainer>
     </div>
