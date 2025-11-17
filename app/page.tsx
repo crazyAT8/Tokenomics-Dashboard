@@ -1,43 +1,95 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useDashboardStore } from '@/lib/store';
 import { useCoinData } from '@/hooks/useCoinData';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { Header } from '@/components/dashboard/Header';
 import { CoinSelector } from '@/components/dashboard/CoinSelector';
 import { PriceChart } from '@/components/charts/PriceChart';
 import { TokenomicsOverview } from '@/components/dashboard/TokenomicsOverview';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { NetworkStatus } from '@/components/ui/NetworkStatus';
 import { 
   DollarSign, 
   TrendingUp, 
   TrendingDown, 
   BarChart3,
   Activity,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 
 export default function Dashboard() {
-  const { selectedCoin, setSelectedCoin } = useDashboardStore();
-  const { marketData, isLoading, error, refreshData } = useCoinData();
+  const { 
+    selectedCoin, 
+    setSelectedCoin, 
+    networkStatus, 
+    setNetworkStatus,
+    errorDetails,
+    retryCount,
+  } = useDashboardStore();
+  const { marketData, isLoading, error, errorDetails: hookErrorDetails, retryCount: hookRetryCount, refreshData } = useCoinData();
+  const networkStatusHook = useNetworkStatus();
+
+  // Sync network status from hook to store
+  useEffect(() => {
+    setNetworkStatus(networkStatusHook);
+  }, [networkStatusHook, setNetworkStatus]);
+
+  const displayErrorDetails = errorDetails || hookErrorDetails;
+  const displayRetryCount = retryCount || hookRetryCount;
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Card className="max-w-md mx-auto">
           <CardContent className="p-6 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              Error Loading Data
+              {displayErrorDetails?.isNetworkError 
+                ? 'Connection Error' 
+                : displayErrorDetails?.isTimeoutError
+                ? 'Timeout Error'
+                : displayErrorDetails?.isRateLimitError
+                ? 'Rate Limit Exceeded'
+                : 'Error Loading Data'}
             </h2>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button
-              onClick={refreshData}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
-            >
-              Try Again
-            </button>
+            <p className="text-gray-600 mb-2">{error}</p>
+            {displayErrorDetails && (
+              <div className="text-sm text-gray-500 mb-4">
+                {displayErrorDetails.isNetworkError && (
+                  <p>Please check your internet connection.</p>
+                )}
+                {displayErrorDetails.isTimeoutError && (
+                  <p>The server is taking too long to respond.</p>
+                )}
+                {displayErrorDetails.isRateLimitError && (
+                  <p>Too many requests. Please wait a moment.</p>
+                )}
+                {displayRetryCount > 0 && (
+                  <p className="mt-2">Retry attempts: {displayRetryCount}</p>
+                )}
+              </div>
+            )}
+            <div className="flex flex-col space-y-2">
+              {networkStatus && !networkStatus.isOnline && (
+                <NetworkStatus
+                  isOnline={networkStatus.isOnline}
+                  wasOffline={networkStatus.wasOffline}
+                  className="mb-4"
+                />
+              )}
+              <button
+                onClick={refreshData}
+                disabled={networkStatus && !networkStatus.isOnline}
+                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span>Try Again</span>
+              </button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -50,6 +102,7 @@ export default function Dashboard() {
         onRefresh={refreshData}
         isLoading={isLoading}
         lastUpdated={marketData ? new Date() : null}
+        networkStatus={networkStatus}
       />
       
       <main className="max-w-7xl mx-auto px-6 py-8">

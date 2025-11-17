@@ -34,11 +34,17 @@ export async function GET(
     };
 
     return NextResponse.json(marketData);
-  } catch (error) {
+  } catch (error: any) {
     console.error('API Error:', error);
+    const statusCode = error.parsedError?.statusCode || error.response?.status || 500;
+    const errorMessage = error.parsedError?.message || error.message || 'Failed to fetch coin data';
+    
     return NextResponse.json(
-      { error: 'Failed to fetch coin data' },
-      { status: 500 }
+      { 
+        error: errorMessage,
+        retryable: error.parsedError?.retryable || false,
+      },
+      { status: statusCode }
     );
   }
 }

@@ -2,6 +2,8 @@
 
 import { useEffect, useCallback } from 'react';
 import { useDashboardStore } from '@/lib/store';
+import { parseError } from '@/lib/utils/errorHandler';
+import { retry } from '@/lib/utils/retry';
 
 export const useCoinData = () => {
   const {
@@ -9,37 +11,73 @@ export const useCoinData = () => {
     marketData,
     isLoading,
     error,
+    errorDetails,
+    networkStatus,
+    retryCount,
     setMarketData,
     setLoading,
     setError,
     updateLastUpdated,
+    incrementRetryCount,
+    resetRetryCount,
   } = useDashboardStore();
 
   const fetchCoinData = useCallback(async () => {
     if (!selectedCoin) return;
+    
+    // Don't attempt fetch if offline
+    if (!networkStatus.isOnline) {
+      const parsedError = parseError({ code: 'NETWORK_OFFLINE', message: 'No internet connection' });
+      setError('No internet connection. Please check your network and try again.', parsedError);
+      return;
+    }
 
     setLoading(true);
     setError(null);
+    resetRetryCount();
 
     try {
       console.log('Fetching data for coin:', selectedCoin, typeof selectedCoin);
-      const response = await fetch(`/api/coins/${selectedCoin}?days=7`);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch coin data');
-      }
+      const data = await retry(async () => {
+        const response = await fetch(`/api/coins/${selectedCoin}?days=7`);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const error = new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+          (error as any).response = { status: response.status, data: errorData };
+          throw error;
+        }
 
-      const data = await response.json();
+        return await response.json();
+      }, {
+        maxRetries: 3,
+        initialDelay: 1000,
+      });
+
       console.log('Received data:', data);
       setMarketData(data);
       updateLastUpdated();
-    } catch (err) {
+      resetRetryCount();
+    } catch (err: any) {
       console.error('Error fetching coin data:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      incrementRetryCount();
+      const parsedError = err.parsedError || parseError(err);
+      const errorMessage = parsedError.message || (err instanceof Error ? err.message : 'An error occurred');
+      setError(errorMessage, parsedError);
     } finally {
       setLoading(false);
     }
-  }, [selectedCoin, setMarketData, setLoading, setError, updateLastUpdated]);
+  }, [
+    selectedCoin, 
+    networkStatus.isOnline,
+    setMarketData, 
+    setLoading, 
+    setError, 
+    updateLastUpdated,
+    incrementRetryCount,
+    resetRetryCount,
+  ]);
 
   useEffect(() => {
     fetchCoinData();
@@ -53,6 +91,8 @@ export const useCoinData = () => {
     marketData,
     isLoading,
     error,
+    errorDetails,
+    retryCount,
     refreshData,
   };
 };

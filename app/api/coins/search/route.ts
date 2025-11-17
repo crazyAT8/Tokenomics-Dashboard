@@ -18,11 +18,17 @@ export async function GET(request: NextRequest) {
 
     console.log('Search API - returning coins:', Array.isArray(coins) ? coins.length : 'not an array', coins);
     return NextResponse.json(coins);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Search API Error:', error);
+    const statusCode = error.parsedError?.statusCode || error.response?.status || 500;
+    const errorMessage = error.parsedError?.message || error.message || 'Failed to search coins';
+    
     return NextResponse.json(
-      { error: 'Failed to search coins' },
-      { status: 500 }
+      { 
+        error: errorMessage,
+        retryable: error.parsedError?.retryable || false,
+      },
+      { status: statusCode }
     );
   }
 }
