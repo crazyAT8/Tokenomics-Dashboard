@@ -9,11 +9,26 @@ export async function GET(
     const coinId = params.id;
     console.log('API Route - coinId:', coinId, typeof coinId);
     const { searchParams } = new URL(request.url);
-    const days = parseInt(searchParams.get('days') || '7');
+    
+    // Check for custom date range
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
+    
+    let priceHistoryOptions: { days?: number; from?: Date; to?: Date } = {};
+    
+    if (fromParam && toParam) {
+      // Custom date range
+      priceHistoryOptions.from = new Date(fromParam);
+      priceHistoryOptions.to = new Date(toParam);
+    } else {
+      // Use days parameter
+      const days = parseInt(searchParams.get('days') || '7');
+      priceHistoryOptions.days = days;
+    }
 
     const [coinData, priceHistory] = await Promise.all([
       fetchCoinData(coinId),
-      fetchPriceHistory(coinId, days),
+      fetchPriceHistory(coinId, priceHistoryOptions),
     ]);
 
     const marketData = {

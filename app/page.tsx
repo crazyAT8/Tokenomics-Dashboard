@@ -6,6 +6,7 @@ import { useCoinData } from '@/hooks/useCoinData';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { Header } from '@/components/dashboard/Header';
 import { CoinSelector } from '@/components/dashboard/CoinSelector';
+import { TimeRangeSelector } from '@/components/dashboard/TimeRangeSelector';
 import { PriceChart } from '@/components/charts/PriceChart';
 import { TokenomicsOverview } from '@/components/dashboard/TokenomicsOverview';
 import { MetricCard } from '@/components/dashboard/MetricCard';
@@ -29,6 +30,8 @@ export default function Dashboard() {
     setNetworkStatus,
     errorDetails,
     retryCount,
+    timeRange,
+    setTimeRange,
   } = useDashboardStore();
   const { marketData, isLoading, error, errorDetails: hookErrorDetails, retryCount: hookRetryCount, refreshData } = useCoinData();
   const networkStatusHook = useNetworkStatus();
@@ -113,6 +116,16 @@ export default function Dashboard() {
             onCoinSelect={setSelectedCoin}
           />
         </div>
+
+        {/* Time Range Selector */}
+        {marketData && (
+          <div className="mb-4 sm:mb-6 lg:mb-8">
+            <TimeRangeSelector
+              selectedRange={timeRange}
+              onRangeChange={setTimeRange}
+            />
+          </div>
+        )}
 
         {isLoading && !marketData ? (
           <div className="flex items-center justify-center py-12">

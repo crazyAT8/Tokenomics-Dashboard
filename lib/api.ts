@@ -55,22 +55,51 @@ export const fetchCoinData = async (coinId: string): Promise<CoinData> => {
 
 export const fetchPriceHistory = async (
   coinId: string,
-  days: number = 7
+  options: {
+    days?: number;
+    from?: Date;
+    to?: Date;
+  } = {}
 ): Promise<PriceHistory[]> => {
   try {
     return await retry(async () => {
+      const { days = 7, from, to } = options;
+      
+      // Calculate days if we have custom date range
+      let calculatedDays = days;
+      if (from && to) {
+        const daysDiff = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+        calculatedDays = daysDiff;
+      }
+
+      // CoinGecko API limits: max 365 days for free tier, can use 'max' for all available data
+      // For custom ranges, we'll use the calculated days
+      const params: any = {
+        vs_currency: 'usd',
+        days: calculatedDays > 365 ? 365 : calculatedDays, // Cap at 365 days
+        interval: calculatedDays <= 1 ? 'hourly' : 'daily',
+      };
+
       const response = await api.get(`/coins/${coinId}/market_chart`, {
-        params: {
-          vs_currency: 'usd',
-          days: days,
-          interval: days <= 1 ? 'hourly' : 'daily',
-        },
+        params,
       });
       
-      return response.data.prices.map(([timestamp, price]: [number, number]) => ({
+      // Filter the results to match the custom date range if provided
+      let prices = response.data.prices.map(([timestamp, price]: [number, number]) => ({
         timestamp,
         price,
       }));
+
+      // If custom date range is provided, filter the results
+      if (from && to) {
+        const fromTime = from.getTime();
+        const toTime = to.getTime();
+        prices = prices.filter((item: PriceHistory) => 
+          item.timestamp >= fromTime && item.timestamp <= toTime
+        );
+      }
+      
+      return prices;
     }, {
       maxRetries: 3,
       initialDelay: 1000,

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { DashboardState, MarketData } from './types';
 import { ApiError } from './utils/errorHandler';
+import { TimeRange } from '@/components/dashboard/TimeRangeSelector';
 
 interface ExtendedDashboardState extends DashboardState {
   networkStatus: {
@@ -9,6 +10,7 @@ interface ExtendedDashboardState extends DashboardState {
   };
   errorDetails: ApiError | null;
   retryCount: number;
+  timeRange: TimeRange;
 }
 
 interface DashboardStore extends ExtendedDashboardState {
@@ -21,6 +23,7 @@ interface DashboardStore extends ExtendedDashboardState {
   setNetworkStatus: (status: { isOnline: boolean; wasOffline: boolean }) => void;
   incrementRetryCount: () => void;
   resetRetryCount: () => void;
+  setTimeRange: (range: TimeRange) => void;
 }
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
@@ -35,6 +38,7 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
     wasOffline: false,
   },
   retryCount: 0,
+  timeRange: { type: '7d', days: 7 },
 
   setSelectedCoin: (coin) => set({ selectedCoin: coin }),
   setMarketData: (data) => set({ marketData: data, error: null, errorDetails: null, retryCount: 0 }),
@@ -46,4 +50,5 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   setNetworkStatus: (status) => set({ networkStatus: status }),
   incrementRetryCount: () => set((state) => ({ retryCount: state.retryCount + 1 })),
   resetRetryCount: () => set({ retryCount: 0 }),
+  setTimeRange: (range) => set({ timeRange: range }),
 }));

@@ -14,6 +14,7 @@ export const useCoinData = () => {
     errorDetails,
     networkStatus,
     retryCount,
+    timeRange,
     setMarketData,
     setLoading,
     setError,
@@ -39,8 +40,19 @@ export const useCoinData = () => {
     try {
       console.log('Fetching data for coin:', selectedCoin, typeof selectedCoin);
       
+      // Build query parameters based on time range
+      const params = new URLSearchParams();
+      if (timeRange.type === 'custom' && timeRange.from && timeRange.to) {
+        params.append('from', timeRange.from.toISOString());
+        params.append('to', timeRange.to.toISOString());
+      } else if (timeRange.days) {
+        params.append('days', timeRange.days.toString());
+      } else {
+        params.append('days', '7'); // Default fallback
+      }
+      
       const data = await retry(async () => {
-        const response = await fetch(`/api/coins/${selectedCoin}?days=7`);
+        const response = await fetch(`/api/coins/${selectedCoin}?${params.toString()}`);
         
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
@@ -70,6 +82,7 @@ export const useCoinData = () => {
     }
   }, [
     selectedCoin, 
+    timeRange,
     networkStatus.isOnline,
     setMarketData, 
     setLoading, 
