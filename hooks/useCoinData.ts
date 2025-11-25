@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useDashboardStore } from '@/lib/store';
 import { parseError } from '@/lib/utils/errorHandler';
 import { retry } from '@/lib/utils/retry';
@@ -23,6 +23,19 @@ export const useCoinData = () => {
     resetRetryCount,
   } = useDashboardStore();
 
+  // Create a stable key for timeRange to prevent unnecessary refetches
+  const timeRangeKeyRef = useRef<string>('');
+  const lastFetchRef = useRef<{ coin: string; key: string } | null>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Generate a stable key from timeRange
+  const getTimeRangeKey = useCallback((range: typeof timeRange) => {
+    if (range.type === 'custom' && range.from && range.to) {
+      return `${range.type}-${range.from.getTime()}-${range.to.getTime()}`;
+    }
+    return `${range.type}-${range.days || 7}`;
+  }, []);
+
   const fetchCoinData = useCallback(async () => {
     if (!selectedCoin) return;
     
@@ -33,12 +46,21 @@ export const useCoinData = () => {
       return;
     }
 
+    // Generate stable key for current request
+    const currentKey = getTimeRangeKey(timeRange);
+    const requestKey = `${selectedCoin}-${currentKey}`;
+    
+    // Skip if we're already fetching the same data
+    if (lastFetchRef.current?.coin === selectedCoin && lastFetchRef.current?.key === currentKey) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
     resetRetryCount();
 
     try {
-      console.log('Fetching data for coin:', selectedCoin, typeof selectedCoin);
+      console.log('Fetching data for coin:', selectedCoin, 'range:', currentKey);
       
       // Build query parameters based on time range
       const params = new URLSearchParams();
@@ -71,6 +93,7 @@ export const useCoinData = () => {
       setMarketData(data);
       updateLastUpdated();
       resetRetryCount();
+      lastFetchRef.current = { coin: selectedCoin, key: currentKey };
     } catch (err: any) {
       console.error('Error fetching coin data:', err);
       incrementRetryCount();
@@ -82,7 +105,10 @@ export const useCoinData = () => {
     }
   }, [
     selectedCoin, 
-    timeRange,
+    timeRange.type,
+    timeRange.days,
+    timeRange.from?.getTime(),
+    timeRange.to?.getTime(),
     networkStatus.isOnline,
     setMarketData, 
     setLoading, 
@@ -90,11 +116,39 @@ export const useCoinData = () => {
     updateLastUpdated,
     incrementRetryCount,
     resetRetryCount,
+    getTimeRangeKey,
   ]);
 
+  // Handle both coin and time range changes with debouncing
   useEffect(() => {
-    fetchCoinData();
-  }, [fetchCoinData]);
+    if (!selectedCoin) return;
+
+    // Clear any pending debounce
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    const currentKey = getTimeRangeKey(timeRange);
+    
+    // Only fetch if the key actually changed
+    if (lastFetchRef.current?.coin === selectedCoin && lastFetchRef.current?.key === currentKey) {
+      return;
+    }
+
+    // Update the ref to track the current key
+    timeRangeKeyRef.current = currentKey;
+
+    // Debounce: wait 300ms before fetching to prevent rapid API calls
+    debounceTimeoutRef.current = setTimeout(() => {
+      fetchCoinData();
+    }, 300);
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [selectedCoin, timeRange.type, timeRange.days, timeRange.from?.getTime(), timeRange.to?.getTime(), getTimeRangeKey, fetchCoinData]);
 
   const refreshData = useCallback(() => {
     fetchCoinData();

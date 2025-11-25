@@ -38,8 +38,15 @@ export default function Dashboard() {
 
   // Sync network status from hook to store
   useEffect(() => {
-    setNetworkStatus(networkStatusHook);
-  }, [networkStatusHook, setNetworkStatus]);
+    // Only update if values actually changed to prevent infinite loops
+    if (
+      networkStatus.isOnline !== networkStatusHook.isOnline ||
+      networkStatus.wasOffline !== networkStatusHook.wasOffline
+    ) {
+      setNetworkStatus(networkStatusHook);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [networkStatusHook.isOnline, networkStatusHook.wasOffline]);
 
   const displayErrorDetails = errorDetails || hookErrorDetails;
   const displayRetryCount = retryCount || hookRetryCount;

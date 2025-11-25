@@ -16,7 +16,7 @@ const DEFAULT_OPTIONS: Required<RetryOptions> = {
   initialDelay: 1000, // 1 second
   maxDelay: 10000, // 10 seconds
   backoffMultiplier: 2,
-  retryableStatuses: [408, 429, 500, 502, 503, 504],
+  retryableStatuses: [408, 500, 502, 503, 504], // Removed 429 - handle separately
   retryableErrors: ['ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNRESET'],
 };
 
@@ -50,7 +50,14 @@ function isRetryableError(error: any, options: Required<RetryOptions>): boolean 
 /**
  * Calculates delay for the next retry attempt using exponential backoff
  */
-function calculateDelay(attempt: number, options: Required<RetryOptions>): number {
+function calculateDelay(attempt: number, options: Required<RetryOptions>, isRateLimit: boolean = false): number {
+  // For rate limit errors (429), use much longer delays
+  if (isRateLimit) {
+    // Start with 60 seconds for rate limits, then double
+    const rateLimitDelay = 60000 * Math.pow(2, attempt);
+    return Math.min(rateLimitDelay, 300000); // Max 5 minutes
+  }
+  
   const delay = options.initialDelay * Math.pow(options.backoffMultiplier, attempt);
   return Math.min(delay, options.maxDelay);
 }
@@ -77,6 +84,14 @@ export async function retry<T>(
       return await fn();
     } catch (error: any) {
       lastError = error;
+      
+      const isRateLimit = error.response?.status === 429;
+      
+      // For rate limit errors, don't retry - just throw immediately
+      // Rate limits need user intervention or longer waits
+      if (isRateLimit) {
+        throw error;
+      }
 
       // Don't retry if it's the last attempt or error is not retryable
       if (attempt === opts.maxRetries || !isRetryableError(error, opts)) {
@@ -84,7 +99,7 @@ export async function retry<T>(
       }
 
       // Calculate delay and wait before retrying
-      const delay = calculateDelay(attempt, opts);
+      const delay = calculateDelay(attempt, opts, false);
       console.log(
         `Retry attempt ${attempt + 1}/${opts.maxRetries} after ${delay}ms delay. Error:`,
         error.message || error
