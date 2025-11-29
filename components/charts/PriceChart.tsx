@@ -20,17 +20,21 @@ interface PriceChartProps {
 export const PriceChart: React.FC<PriceChartProps> = ({ data, height }) => {
   const [chartHeight, setChartHeight] = useState(height || 300);
   const [isMobile, setIsMobile] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
 
   useEffect(() => {
     const updateDimensions = () => {
-      const mobile = window.innerWidth < 640;
+      const width = window.innerWidth;
+      const mobile = width < 640;
+      const tablet = width >= 640 && width < 1024;
       setIsMobile(mobile);
+      setIsTablet(tablet);
       if (!height) {
         // Dynamic height based on screen size
         if (mobile) {
-          setChartHeight(250);
-        } else if (window.innerWidth < 1024) {
-          setChartHeight(300);
+          setChartHeight(220);
+        } else if (tablet) {
+          setChartHeight(280);
         } else {
           setChartHeight(350);
         }
@@ -54,9 +58,11 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height }) => {
     return [`$${value.toLocaleString()}`, 'Price'];
   };
 
-  // Adjust margins for mobile
+  // Adjust margins for mobile and tablet
   const margins = isMobile 
     ? { top: 5, right: 10, left: 0, bottom: 20 }
+    : isTablet
+    ? { top: 5, right: 20, left: 15, bottom: 5 }
     : { top: 5, right: 30, left: 20, bottom: 5 };
 
   return (

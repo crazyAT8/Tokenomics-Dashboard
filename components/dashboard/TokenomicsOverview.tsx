@@ -67,30 +67,30 @@ export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
   ];
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-3 sm:space-y-4 md:space-y-6">
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {metrics.map((metric, index) => (
           <Card key={index} className="hover:shadow-md active:shadow-sm transition-all duration-200 touch-manipulation">
-            <CardContent className="p-4 sm:p-5">
+            <CardContent className="p-3 sm:p-4 md:p-5">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">
                     {metric.title}
                   </p>
-                  <p className="text-lg sm:text-xl font-bold text-gray-900 break-words">
+                  <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900 break-words">
                     {typeof metric.value === 'number' 
                       ? formatNumber(metric.value) 
                       : metric.value
                     }
                   </p>
                   {metric.subtitle && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 mt-1 break-words">
                       {metric.subtitle}
                     </p>
                   )}
                 </div>
-                <div className="text-primary-500 ml-3 flex-shrink-0">
+                <div className="text-primary-500 ml-2 sm:ml-3 flex-shrink-0">
                   {metric.icon}
                 </div>
               </div>
@@ -110,10 +110,10 @@ export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
 
       {/* Supply Distribution Chart */}
       <Card>
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="text-base sm:text-lg">Supply Distribution</CardTitle>
+        <CardHeader className="p-3 sm:p-4 md:p-6">
+          <CardTitle className="text-sm sm:text-base md:text-lg">Supply Distribution</CardTitle>
         </CardHeader>
-        <CardContent className="p-2 sm:p-4 lg:p-6">
+        <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6">
           <TokenomicsChart data={tokenomics} />
         </CardContent>
       </Card>

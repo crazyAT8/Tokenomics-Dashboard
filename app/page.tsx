@@ -115,9 +115,9 @@ export default function Dashboard() {
         networkStatus={networkStatus}
       />
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-6 lg:py-8">
         {/* Coin Selector */}
-        <div className="mb-4 sm:mb-6 lg:mb-8">
+        <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
           <CoinSelector
             selectedCoin={selectedCoin}
             onCoinSelect={setSelectedCoin}
@@ -126,7 +126,7 @@ export default function Dashboard() {
 
         {/* Time Range Selector */}
         {marketData && (
-          <div className="mb-4 sm:mb-6 lg:mb-8">
+          <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
             <TimeRangeSelector
               selectedRange={timeRange}
               onRangeChange={setTimeRange}
@@ -135,41 +135,41 @@ export default function Dashboard() {
         )}
 
         {isLoading && !marketData ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-12 sm:py-16">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading coin data...</p>
+              <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <p className="text-sm sm:text-base text-gray-600">Loading coin data...</p>
             </div>
           </div>
         ) : marketData ? (
           <>
             {/* Price Overview */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-              <div className="lg:col-span-2 order-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6 mb-4 sm:mb-6 md:mb-8">
+              <div className="md:col-span-2 order-1">
                 <Card>
-                  <CardHeader className="p-4 sm:p-6">
-                    <CardTitle className="flex items-center text-base sm:text-lg">
+                  <CardHeader className="p-3 sm:p-4 md:p-5 lg:p-6">
+                    <CardTitle className="flex items-center text-sm sm:text-base md:text-lg">
                       <img
                         src={marketData.coin.image}
                         alt={marketData.coin.name}
-                        className="w-6 h-6 sm:w-8 sm:h-8 mr-2 sm:mr-3 rounded-full flex-shrink-0"
+                        className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mr-2 sm:mr-3 rounded-full flex-shrink-0"
                       />
                       <span className="truncate">{marketData.coin.name} Price Chart</span>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-2 sm:p-4 lg:p-6">
+                  <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6">
                     <PriceChart data={marketData.priceHistory} />
                   </CardContent>
                 </Card>
               </div>
               
-              <div className="space-y-3 sm:space-y-4 order-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-3 sm:gap-4 order-2">
                 <MetricCard
                   title="Current Price"
                   value={marketData.coin.current_price}
                   change={marketData.coin.price_change_percentage_24h}
                   changeType={marketData.coin.price_change_percentage_24h >= 0 ? 'positive' : 'negative'}
-                  icon={<DollarSign className="h-5 w-5" />}
+                  icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />}
                 />
                 
                 <MetricCard
@@ -177,25 +177,25 @@ export default function Dashboard() {
                   value={marketData.coin.market_cap}
                   change={marketData.coin.market_cap_change_percentage_24h}
                   changeType={marketData.coin.market_cap_change_percentage_24h >= 0 ? 'positive' : 'negative'}
-                  icon={<BarChart3 className="h-5 w-5" />}
+                  icon={<BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />}
                 />
                 
                 <MetricCard
                   title="24h Volume"
                   value={marketData.coin.total_volume}
-                  icon={<Activity className="h-5 w-5" />}
+                  icon={<Activity className="h-4 w-4 sm:h-5 sm:w-5" />}
                 />
                 
                 <MetricCard
                   title="24h High"
                   value={marketData.coin.high_24h}
-                  icon={<TrendingUp className="h-5 w-5" />}
+                  icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
                 />
                 
                 <MetricCard
                   title="24h Low"
                   value={marketData.coin.low_24h}
-                  icon={<TrendingDown className="h-5 w-5" />}
+                  icon={<TrendingDown className="h-4 w-4 sm:h-5 sm:w-5" />}
                 />
               </div>
             </div>

@@ -33,25 +33,25 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-      <div className="px-4 sm:px-6 py-3 sm:py-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+      <div className="px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 md:gap-4">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
             <div className="p-1.5 sm:p-2 bg-primary-100 rounded-lg flex-shrink-0">
-              <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" />
+              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-primary-600" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 truncate">
+              <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-gray-900 truncate">
                 Tokenomics Dashboard
               </h1>
-              <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">
+              <p className="text-xs sm:text-sm text-gray-500 hidden sm:block truncate">
                 Real-time cryptocurrency tokenomics analysis
               </p>
             </div>
           </div>
           
-          <div className="flex items-center justify-end gap-2 sm:gap-4 w-full sm:w-auto">
+          <div className="flex items-center justify-end gap-2 sm:gap-3 md:gap-4 w-full sm:w-auto">
             {networkStatus && (
-              <div className="hidden sm:block">
+              <div className="hidden md:block">
                 <NetworkStatus
                   isOnline={networkStatus.isOnline}
                   wasOffline={networkStatus.wasOffline}
@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
             {lastUpdated && (
               <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
-                <span className="hidden sm:inline">Last updated: </span>
+                <span className="hidden md:inline">Last updated: </span>
                 <span>{formatLastUpdated(lastUpdated)}</span>
               </div>
             )}
@@ -70,13 +70,13 @@ export const Header: React.FC<HeaderProps> = ({
               variant="outline"
               size="sm"
               disabled={networkStatus && !networkStatus.isOnline}
-              className="min-h-[44px] min-w-[44px] touch-manipulation active:scale-95 transition-transform"
+              className="min-h-[44px] min-w-[44px] sm:min-h-[32px] touch-manipulation active:scale-95 transition-transform"
             >
               <RefreshCw className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Refresh</span>
             </Button>
             {networkStatus && (
-              <div className="sm:hidden">
+              <div className="md:hidden">
                 <NetworkStatus
                   isOnline={networkStatus.isOnline}
                   wasOffline={networkStatus.wasOffline}

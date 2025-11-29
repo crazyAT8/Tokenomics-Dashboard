@@ -55,19 +55,19 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
   return (
     <Card className="hover:shadow-md active:shadow-sm transition-all duration-200 touch-manipulation">
-      <CardContent className="p-4 sm:p-5 lg:p-6">
+      <CardContent className="p-3 sm:p-4 md:p-5 lg:p-6">
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">{title}</p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 break-words">
+            <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-1 break-words">
               {formatValue(value)}
             </p>
             {subtitle && (
-              <p className="text-xs text-gray-500">{subtitle}</p>
+              <p className="text-xs text-gray-500 break-words">{subtitle}</p>
             )}
           </div>
           {icon && (
-            <div className="ml-3 sm:ml-4 text-primary-500 flex-shrink-0">
+            <div className="ml-2 sm:ml-3 md:ml-4 text-primary-500 flex-shrink-0">
               {icon}
             </div>
           )}

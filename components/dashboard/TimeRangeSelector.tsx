@@ -125,14 +125,14 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
 
   return (
     <div className="w-full">
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 mb-3">
         {PRESETS.map((preset) => (
           <Button
             key={preset.value}
             variant={selectedRange.type === preset.value ? 'primary' : 'outline'}
             size="sm"
             onClick={() => handlePresetClick(preset.value, preset.days)}
-            className="min-w-[60px]"
+            className="min-w-[50px] sm:min-w-[60px] text-xs sm:text-sm flex-1 sm:flex-none"
           >
             {preset.label}
           </Button>
@@ -141,25 +141,26 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
           variant={selectedRange.type === 'custom' ? 'primary' : 'outline'}
           size="sm"
           onClick={handleCustomRangeClick}
-          className="flex items-center gap-1"
+          className="flex items-center gap-1 text-xs sm:text-sm flex-1 sm:flex-none"
         >
-          <Calendar className="h-4 w-4" />
-          Custom
+          <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <span className="hidden xs:inline">Custom</span>
+          <span className="xs:hidden">Custom</span>
         </Button>
       </div>
 
       {showCustomPicker && (
-        <Card className="p-4 mt-2">
+        <Card className="p-3 sm:p-4 mt-2">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-gray-700">Custom Date Range</h3>
+              <h3 className="text-xs sm:text-sm font-medium text-gray-700">Custom Date Range</h3>
               {selectedRange.type === 'custom' && (
                 <button
                   onClick={() => {
                     const preset = PRESETS[1]; // Default to 7 days
                     handlePresetClick(preset.value, preset.days);
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
                   aria-label="Close custom picker"
                 >
                   <X className="h-4 w-4" />
@@ -169,7 +170,7 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   From Date
                 </label>
                 <Input
@@ -177,10 +178,11 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
                   max={toDate || new Date().toISOString().split('T')[0]}
+                  className="min-h-[44px] text-base sm:text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   To Date
                 </label>
                 <Input
@@ -189,23 +191,24 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
                   onChange={(e) => setToDate(e.target.value)}
                   min={fromDate}
                   max={new Date().toISOString().split('T')[0]}
+                  className="min-h-[44px] text-base sm:text-sm"
                 />
               </div>
             </div>
 
             {selectedRange.type === 'custom' && formatDateRange() && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 break-words">
                 Selected: {formatDateRange()}
               </p>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Button
                 variant="primary"
                 size="sm"
                 onClick={handleCustomDateApply}
                 disabled={!fromDate || !toDate}
-                className="flex-1"
+                className="flex-1 min-h-[44px] sm:min-h-[32px]"
               >
                 Apply
               </Button>
@@ -213,7 +216,7 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={handleCustomDateCancel}
-                className="flex-1"
+                className="flex-1 min-h-[44px] sm:min-h-[32px]"
               >
                 Cancel
               </Button>

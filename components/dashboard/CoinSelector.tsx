@@ -90,7 +90,7 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
             className="fixed inset-0 bg-black/20 z-40 sm:hidden"
             onClick={() => setIsOpen(false)}
           />
-          <Card className="absolute top-full left-0 right-0 mt-2 z-50 max-h-[calc(100vh-200px)] sm:max-h-96 overflow-hidden shadow-xl">
+          <Card className="absolute top-full left-0 right-0 mt-2 z-50 max-h-[calc(100vh-180px)] sm:max-h-[calc(100vh-220px)] md:max-h-96 overflow-hidden shadow-xl">
             <div className="p-3 sm:p-4 border-b border-gray-200">
               <Input
                 variant="search"
@@ -102,7 +102,7 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                 autoFocus
               />
             </div>
-            <div className="max-h-[calc(100vh-300px)] sm:max-h-64 overflow-y-auto overscroll-contain">
+            <div className="max-h-[calc(100vh-280px)] sm:max-h-[calc(100vh-300px)] md:max-h-64 overflow-y-auto overscroll-contain">
               {isLoading ? (
                 <div className="p-4 text-center text-gray-500">
                   Loading coins...

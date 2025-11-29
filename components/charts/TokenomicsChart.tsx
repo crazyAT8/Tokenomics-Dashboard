@@ -56,13 +56,15 @@ export const TokenomicsChart: React.FC<TokenomicsChartProps> = ({ data }) => {
 
   useEffect(() => {
     const updateDimensions = () => {
-      const mobile = window.innerWidth < 640;
+      const width = window.innerWidth;
+      const mobile = width < 640;
+      const tablet = width >= 640 && width < 1024;
       setIsMobile(mobile);
       if (mobile) {
-        setChartHeight(250);
-        setOuterRadius(60);
-      } else if (window.innerWidth < 1024) {
-        setChartHeight(300);
+        setChartHeight(220);
+        setOuterRadius(55);
+      } else if (tablet) {
+        setChartHeight(280);
         setOuterRadius(70);
       } else {
         setChartHeight(320);
