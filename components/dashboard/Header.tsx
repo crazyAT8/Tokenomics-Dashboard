@@ -70,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
               variant="outline"
               size="sm"
               disabled={networkStatus && !networkStatus.isOnline}
-              className="min-h-[44px] min-w-[44px] sm:min-h-[32px] touch-manipulation active:scale-95 transition-transform"
+              className="min-h-[44px] min-w-[44px] sm:min-h-[32px] touch-manipulation active:scale-[0.97] transition-transform"
             >
               <RefreshCw className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Refresh</span>

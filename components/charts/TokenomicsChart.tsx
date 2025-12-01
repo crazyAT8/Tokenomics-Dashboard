@@ -39,7 +39,7 @@ export const TokenomicsChart: React.FC<TokenomicsChartProps> = ({ data }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white p-2 sm:p-3 border border-gray-200 rounded-lg shadow-lg">
+        <div className="bg-white p-2 sm:p-3 border border-gray-200 rounded-lg shadow-lg touch-none pointer-events-none">
           <p className="font-medium text-xs sm:text-sm">{data.name}</p>
           <p className="text-xs sm:text-sm text-gray-600">
             {formatValue(data.value)} ({data.percentage.toFixed(1)}%)
@@ -92,7 +92,16 @@ export const TokenomicsChart: React.FC<TokenomicsChartProps> = ({ data }) => {
   }, []);
 
   return (
-    <div className="w-full min-w-0 overflow-hidden" style={{ height: `${chartHeight}px` }}>
+    <div 
+      className="w-full min-w-0 overflow-hidden chart-container" 
+      style={{ height: `${chartHeight}px` }}
+      onTouchStart={(e) => {
+        // Prevent page scroll when interacting with chart
+        if (e.touches.length === 1) {
+          e.stopPropagation();
+        }
+      }}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
@@ -126,6 +135,9 @@ export const TokenomicsChart: React.FC<TokenomicsChartProps> = ({ data }) => {
             wrapperStyle={{
               zIndex: 1000,
             }}
+            // Better touch interaction
+            allowEscapeViewBox={{ x: false, y: false }}
+            offset={isMobile ? 10 : 0}
           />
         </PieChart>
       </ResponsiveContainer>

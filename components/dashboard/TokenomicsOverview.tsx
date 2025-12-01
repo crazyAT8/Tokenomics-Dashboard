@@ -71,7 +71,7 @@ export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {metrics.map((metric, index) => (
-          <Card key={index} className="hover:shadow-md active:shadow-sm transition-all duration-200 touch-manipulation">
+          <Card key={index} className="hover:shadow-md active:shadow-sm active:scale-[0.98] transition-all duration-200 touch-manipulation select-none">
             <CardContent className="p-3 sm:p-4 md:p-5">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">

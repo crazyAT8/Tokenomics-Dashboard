@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +20,9 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [coins, setCoins] = useState<CoinData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef<number>(0);
+  const touchStartX = useRef<number>(0);
 
   const fetchCoins = async (query: string = '') => {
     setIsLoading(true);
@@ -59,6 +62,50 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
     setSearchQuery('');
   };
 
+  // Handle swipe to close on mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isOpen) return;
+    
+    const touchY = e.touches[0].clientY;
+    const touchX = e.touches[0].clientX;
+    const deltaY = touchY - touchStartY.current;
+    const deltaX = Math.abs(touchX - touchStartX.current);
+    
+    // Only close if swiping down (not sideways) and more than 50px
+    if (deltaY > 50 && deltaX < 30 && dropdownRef.current) {
+      const scrollTop = dropdownRef.current.scrollTop;
+      // Only close if at the top of the scroll area
+      if (scrollTop === 0) {
+        setIsOpen(false);
+      }
+    }
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      // Use capture phase for better touch handling
+      document.addEventListener('mousedown', handleClickOutside, true);
+      document.addEventListener('touchstart', handleClickOutside, true);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('touchstart', handleClickOutside, true);
+    };
+  }, [isOpen]);
+
   const selectedCoinData = coins.find(coin => coin.id === selectedCoin);
 
   return (
@@ -66,7 +113,7 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
       <Button
         variant="outline"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full justify-between min-h-[44px] touch-manipulation active:scale-[0.98] transition-transform"
+        className="w-full justify-between min-h-[44px] touch-manipulation active:scale-[0.97] transition-transform"
       >
         <div className="flex items-center min-w-0 flex-1">
           {selectedCoinData && (
@@ -87,10 +134,18 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
         <>
           {/* Backdrop for mobile */}
           <div 
-            className="fixed inset-0 bg-black/20 z-40 sm:hidden"
+            className="fixed inset-0 bg-black/20 z-40 sm:hidden touch-none"
             onClick={() => setIsOpen(false)}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              setIsOpen(false);
+            }}
           />
-          <Card className="absolute top-full left-0 right-0 mt-2 z-50 max-h-[calc(100vh-180px)] sm:max-h-[calc(100vh-220px)] md:max-h-96 overflow-hidden shadow-xl">
+          <Card 
+            className="absolute top-full left-0 right-0 mt-2 z-50 max-h-[calc(100vh-180px)] sm:max-h-[calc(100vh-220px)] md:max-h-96 overflow-hidden shadow-xl"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+          >
             <div className="p-3 sm:p-4 border-b border-gray-200">
               <Input
                 variant="search"
@@ -102,7 +157,10 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                 autoFocus
               />
             </div>
-            <div className="max-h-[calc(100vh-280px)] sm:max-h-[calc(100vh-300px)] md:max-h-64 overflow-y-auto overscroll-contain">
+            <div 
+              ref={dropdownRef}
+              className="max-h-[calc(100vh-280px)] sm:max-h-[calc(100vh-300px)] md:max-h-64 overflow-y-auto overscroll-contain scroll-smooth-touch"
+            >
               {isLoading ? (
                 <div className="p-4 text-center text-gray-500">
                   Loading coins...
@@ -116,7 +174,7 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                   <button
                     key={coin.id}
                     onClick={() => handleCoinSelect(coin.id)}
-                    className="w-full flex items-center p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[56px] touch-manipulation"
+                    className="w-full flex items-center p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[56px] touch-manipulation active:scale-[0.98] select-none"
                   >
                     <img
                       src={coin.image}

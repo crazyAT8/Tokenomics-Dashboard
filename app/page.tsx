@@ -94,7 +94,7 @@ export default function Dashboard() {
               <button
                 onClick={refreshData}
                 disabled={networkStatus && !networkStatus.isOnline}
-                className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2 touch-manipulation active:scale-[0.98]"
+                className="min-h-[44px] px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2 touch-manipulation active:scale-[0.97] select-none"
               >
                 <RefreshCw className="h-4 w-4" />
                 <span>Try Again</span>

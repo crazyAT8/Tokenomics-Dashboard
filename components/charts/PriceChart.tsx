@@ -89,7 +89,16 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height }) => {
     : { top: 10, right: 30, left: 30, bottom: 30 };
 
   return (
-    <div className="w-full min-w-0 overflow-hidden" style={{ height: `${chartHeight}px` }}>
+    <div 
+      className="w-full min-w-0 overflow-hidden chart-container" 
+      style={{ height: `${chartHeight}px` }}
+      onTouchStart={(e) => {
+        // Prevent page scroll when interacting with chart
+        if (e.touches.length === 1) {
+          e.stopPropagation();
+        }
+      }}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={margins}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -121,13 +130,18 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height }) => {
               borderRadius: '8px',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
               fontSize: isSmallMobile ? '11px' : isMobile ? '12px' : '14px',
-              padding: isSmallMobile ? '6px' : isMobile ? '8px' : '12px',
+              padding: isSmallMobile ? '8px' : isMobile ? '10px' : '12px',
               maxWidth: isMobile ? '200px' : 'none',
+              pointerEvents: 'none',
             }}
             wrapperStyle={{
               zIndex: 1000,
             }}
             position={{ x: undefined, y: undefined }}
+            // Better touch interaction
+            allowEscapeViewBox={{ x: false, y: false }}
+            // Prevent tooltip from being cut off on mobile
+            offset={isMobile ? 10 : 0}
           />
           <Line
             type="monotone"

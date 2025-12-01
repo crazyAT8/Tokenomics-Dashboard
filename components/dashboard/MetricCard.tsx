@@ -54,7 +54,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   return (
-    <Card className="hover:shadow-md active:shadow-sm transition-all duration-200 touch-manipulation">
+    <Card className="hover:shadow-md active:shadow-sm active:scale-[0.98] transition-all duration-200 touch-manipulation select-none">
       <CardContent className="p-3 sm:p-4 md:p-5 lg:p-6">
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
