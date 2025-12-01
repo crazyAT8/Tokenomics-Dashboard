@@ -144,9 +144,9 @@ export default function Dashboard() {
         ) : marketData ? (
           <>
             {/* Price Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6 mb-4 sm:mb-6 md:mb-8">
-              <div className="md:col-span-2 order-1">
-                <Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6 mb-4 sm:mb-6 md:mb-8">
+              <div className="lg:col-span-2 order-1 min-w-0">
+                <Card className="overflow-hidden">
                   <CardHeader className="p-3 sm:p-4 md:p-5 lg:p-6">
                     <CardTitle className="flex items-center text-sm sm:text-base md:text-lg">
                       <img
@@ -157,13 +157,13 @@ export default function Dashboard() {
                       <span className="truncate">{marketData.coin.name} Price Chart</span>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6">
+                  <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6 min-w-0">
                     <PriceChart data={marketData.priceHistory} />
                   </CardContent>
                 </Card>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-3 sm:gap-4 order-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4 order-2">
                 <MetricCard
                   title="Current Price"
                   value={marketData.coin.current_price}
@@ -201,7 +201,7 @@ export default function Dashboard() {
             </div>
 
             {/* Tokenomics Overview */}
-            <div className="order-3">
+            <div className="order-3 min-w-0">
               <TokenomicsOverview tokenomics={marketData.tokenomics} />
             </div>
           </>

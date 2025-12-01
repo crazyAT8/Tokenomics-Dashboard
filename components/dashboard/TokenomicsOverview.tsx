@@ -109,11 +109,11 @@ export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
       </div>
 
       {/* Supply Distribution Chart */}
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader className="p-3 sm:p-4 md:p-6">
           <CardTitle className="text-sm sm:text-base md:text-lg">Supply Distribution</CardTitle>
         </CardHeader>
-        <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6">
+        <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6 min-w-0">
           <TokenomicsChart data={tokenomics} />
         </CardContent>
       </Card>

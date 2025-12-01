@@ -53,4 +53,26 @@
   .touch-target {
     @apply min-h-[44px] min-w-[44px];
   }
+
+  /* Chart container improvements for responsive design */
+  .chart-container {
+    @apply w-full min-w-0 overflow-hidden;
+    position: relative;
+  }
+
+  /* Ensure Recharts ResponsiveContainer works properly */
+  .recharts-wrapper {
+    @apply min-w-0;
+  }
+
+  .recharts-surface {
+    @apply max-w-full;
+  }
+
+  /* Prevent horizontal scroll on mobile */
+  @media (max-width: 640px) {
+    body {
+      overflow-x: hidden;
+    }
+  }
 }

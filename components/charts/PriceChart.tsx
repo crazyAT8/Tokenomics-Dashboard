@@ -21,20 +21,25 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height }) => {
   const [chartHeight, setChartHeight] = useState(height || 300);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
+  const [isSmallMobile, setIsSmallMobile] = useState(false);
 
   useEffect(() => {
     const updateDimensions = () => {
       const width = window.innerWidth;
+      const smallMobile = width < 400;
       const mobile = width < 640;
       const tablet = width >= 640 && width < 1024;
+      setIsSmallMobile(smallMobile);
       setIsMobile(mobile);
       setIsTablet(tablet);
       if (!height) {
         // Dynamic height based on screen size
-        if (mobile) {
-          setChartHeight(220);
+        if (smallMobile) {
+          setChartHeight(200);
+        } else if (mobile) {
+          setChartHeight(240);
         } else if (tablet) {
-          setChartHeight(280);
+          setChartHeight(300);
         } else {
           setChartHeight(350);
         }
@@ -48,25 +53,43 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height }) => {
 
   const formatXAxis = (tickItem: number) => {
     const date = new Date(tickItem);
+    if (isSmallMobile) {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
     if (isMobile) {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  const formatTooltip = (value: number, name: string) => {
-    return [`$${value.toLocaleString()}`, 'Price'];
+  const formatYAxis = (value: number) => {
+    if (isSmallMobile) {
+      if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
+      if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+      if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
+      return `$${value.toFixed(0)}`;
+    }
+    if (isMobile && value >= 1000) {
+      return `$${(value / 1000).toFixed(1)}K`;
+    }
+    return `$${value.toLocaleString()}`;
   };
 
-  // Adjust margins for mobile and tablet
-  const margins = isMobile 
-    ? { top: 5, right: 10, left: 0, bottom: 20 }
+  const formatTooltip = (value: number, name: string) => {
+    return [`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Price'];
+  };
+
+  // Adjust margins for different screen sizes
+  const margins = isSmallMobile
+    ? { top: 10, right: 5, left: 5, bottom: 50 }
+    : isMobile 
+    ? { top: 10, right: 10, left: 10, bottom: 50 }
     : isTablet
-    ? { top: 5, right: 20, left: 15, bottom: 5 }
-    : { top: 5, right: 30, left: 20, bottom: 5 };
+    ? { top: 10, right: 20, left: 20, bottom: 40 }
+    : { top: 10, right: 30, left: 30, bottom: 30 };
 
   return (
-    <div className="w-full" style={{ height: `${chartHeight}px` }}>
+    <div className="w-full min-w-0 overflow-hidden" style={{ height: `${chartHeight}px` }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={margins}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -74,22 +97,20 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height }) => {
             dataKey="timestamp"
             tickFormatter={formatXAxis}
             stroke="#666"
-            fontSize={isMobile ? 10 : 12}
+            fontSize={isSmallMobile ? 9 : isMobile ? 10 : 12}
             angle={isMobile ? -45 : 0}
             textAnchor={isMobile ? 'end' : 'middle'}
-            height={isMobile ? 60 : 30}
-            interval={isMobile ? 'preserveStartEnd' : 0}
+            height={isSmallMobile ? 70 : isMobile ? 60 : 30}
+            interval={isSmallMobile ? 'preserveStartEnd' : isMobile ? 'preserveStartEnd' : 0}
+            tick={{ fill: '#666' }}
           />
           <YAxis
-            tickFormatter={(value) => {
-              if (isMobile && value >= 1000) {
-                return `$${(value / 1000).toFixed(1)}K`;
-              }
-              return `$${value.toLocaleString()}`;
-            }}
+            tickFormatter={formatYAxis}
             stroke="#666"
-            fontSize={isMobile ? 10 : 12}
-            width={isMobile ? 50 : 80}
+            fontSize={isSmallMobile ? 9 : isMobile ? 10 : 12}
+            width={isSmallMobile ? 45 : isMobile ? 60 : 80}
+            tick={{ fill: '#666' }}
+            domain={['auto', 'auto']}
           />
           <Tooltip
             formatter={formatTooltip}
@@ -99,20 +120,27 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height }) => {
               border: '1px solid #e5e7eb',
               borderRadius: '8px',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              fontSize: isMobile ? '12px' : '14px',
-              padding: isMobile ? '8px' : '12px',
+              fontSize: isSmallMobile ? '11px' : isMobile ? '12px' : '14px',
+              padding: isSmallMobile ? '6px' : isMobile ? '8px' : '12px',
+              maxWidth: isMobile ? '200px' : 'none',
             }}
             wrapperStyle={{
               zIndex: 1000,
             }}
+            position={{ x: undefined, y: undefined }}
           />
           <Line
             type="monotone"
             dataKey="price"
             stroke="#3b82f6"
-            strokeWidth={isMobile ? 1.5 : 2}
+            strokeWidth={isSmallMobile ? 1.5 : isMobile ? 2 : 2.5}
             dot={false}
-            activeDot={{ r: isMobile ? 5 : 6, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
+            activeDot={{ 
+              r: isSmallMobile ? 4 : isMobile ? 5 : 6, 
+              fill: '#3b82f6', 
+              strokeWidth: 2, 
+              stroke: '#fff' 
+            }}
           />
         </LineChart>
       </ResponsiveContainer>
