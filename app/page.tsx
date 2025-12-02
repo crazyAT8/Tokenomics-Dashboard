@@ -4,10 +4,12 @@ import React, { useEffect } from 'react';
 import { useDashboardStore } from '@/lib/store';
 import { useCoinData } from '@/hooks/useCoinData';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { Header } from '@/components/dashboard/Header';
 import { CoinSelector } from '@/components/dashboard/CoinSelector';
 import { TimeRangeSelector } from '@/components/dashboard/TimeRangeSelector';
 import { CurrencySelector } from '@/components/dashboard/CurrencySelector';
+import { CurrencyRates } from '@/components/dashboard/CurrencyRates';
 import { PriceChart } from '@/components/charts/PriceChart';
 import { TokenomicsOverview } from '@/components/dashboard/TokenomicsOverview';
 import { MetricCard } from '@/components/dashboard/MetricCard';
@@ -38,6 +40,7 @@ export default function Dashboard() {
   } = useDashboardStore();
   const { marketData, isLoading, error, errorDetails: hookErrorDetails, retryCount: hookRetryCount, refreshData } = useCoinData();
   const networkStatusHook = useNetworkStatus();
+  const { exchangeRates, isLoading: ratesLoading, refreshRates } = useExchangeRates(currency);
 
   // Sync network status from hook to store
   useEffect(() => {
@@ -128,6 +131,16 @@ export default function Dashboard() {
           <CurrencySelector
             selectedCurrency={currency}
             onCurrencySelect={setCurrency}
+          />
+        </div>
+
+        {/* Currency Exchange Rates */}
+        <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
+          <CurrencyRates
+            exchangeRates={exchangeRates}
+            baseCurrency={currency}
+            isLoading={ratesLoading}
+            onRefresh={refreshRates}
           />
         </div>
 

@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios';
-import { CoinData, PriceHistory } from './types';
+import { CoinData, PriceHistory, ExchangeRates } from './types';
 import { retry } from './utils/retry';
 import { parseError, getUserFriendlyErrorMessage } from './utils/errorHandler';
 
@@ -227,6 +227,37 @@ export const searchCoins = async (query: string): Promise<CoinData[]> => {
     });
   } catch (error: any) {
     console.error('Error searching coins:', error);
+    const parsedError = error.parsedError || parseError(error);
+    const message = getUserFriendlyErrorMessage(parsedError);
+    const enhancedError = new Error(message);
+    (enhancedError as any).parsedError = parsedError;
+    throw enhancedError;
+  }
+};
+
+export const fetchExchangeRates = async (baseCurrency: string = 'usd'): Promise<ExchangeRates> => {
+  try {
+    return await retry(async () => {
+      // Use exchangerate-api.com free tier (no API key required)
+      // Convert currency code to uppercase for the API
+      const base = baseCurrency.toUpperCase();
+      const response = await axios.get(`https://api.exchangerate-api.com/v4/latest/${base}`, {
+        timeout: 5000,
+      });
+      
+      return {
+        base: base.toLowerCase(),
+        rates: response.data.rates,
+        timestamp: Date.now(),
+      };
+    }, {
+      maxRetries: 2,
+      initialDelay: 500,
+    });
+  } catch (error: any) {
+    console.error('Error fetching exchange rates:', error);
+    // Fallback: return rates based on USD if the API fails
+    // This is a simple fallback - in production you might want better error handling
     const parsedError = error.parsedError || parseError(error);
     const message = getUserFriendlyErrorMessage(parsedError);
     const enhancedError = new Error(message);

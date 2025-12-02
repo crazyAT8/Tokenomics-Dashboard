@@ -57,3 +57,9 @@ export interface DashboardState {
   error: string | null;
   lastUpdated: Date | null;
 }
+
+export interface ExchangeRates {
+  base: string;
+  rates: Record<string, number>;
+  timestamp: number;
+}
