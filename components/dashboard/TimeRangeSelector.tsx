@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
+import { DateRangePicker } from '@/components/ui/DateRangePicker';
 
 export type TimeRangePreset = '1d' | '7d' | '30d' | '90d' | '1y' | 'custom';
 
@@ -33,22 +33,18 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
   onRangeChange,
 }) => {
   const [showCustomPicker, setShowCustomPicker] = useState(selectedRange.type === 'custom');
-  const [fromDate, setFromDate] = useState(
-    selectedRange.from ? selectedRange.from.toISOString().split('T')[0] : ''
+  const [fromDate, setFromDate] = useState<Date | null>(
+    selectedRange.from || null
   );
-  const [toDate, setToDate] = useState(
-    selectedRange.to ? selectedRange.to.toISOString().split('T')[0] : ''
+  const [toDate, setToDate] = useState<Date | null>(
+    selectedRange.to || null
   );
 
   // Sync local state with selectedRange prop changes
   useEffect(() => {
     setShowCustomPicker(selectedRange.type === 'custom');
-    if (selectedRange.from) {
-      setFromDate(selectedRange.from.toISOString().split('T')[0]);
-    }
-    if (selectedRange.to) {
-      setToDate(selectedRange.to.toISOString().split('T')[0]);
-    }
+    setFromDate(selectedRange.from || null);
+    setToDate(selectedRange.to || null);
   }, [selectedRange]);
 
   const handlePresetClick = (preset: TimeRangePreset, days: number) => {
@@ -63,32 +59,36 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
       const to = new Date();
       const from = new Date();
       from.setDate(from.getDate() - 30);
-      setFromDate(from.toISOString().split('T')[0]);
-      setToDate(to.toISOString().split('T')[0]);
+      setFromDate(from);
+      setToDate(to);
     }
   };
 
   const handleCustomDateApply = () => {
     if (fromDate && toDate) {
-      const from = new Date(fromDate);
-      const to = new Date(toDate);
+      // Normalize dates for comparison (ignore time)
+      const normalizedFrom = new Date(fromDate);
+      normalizedFrom.setHours(0, 0, 0, 0);
+      const normalizedTo = new Date(toDate);
+      normalizedTo.setHours(0, 0, 0, 0);
       
       // Validate dates
-      if (from > to) {
+      if (normalizedFrom > normalizedTo) {
         alert('Start date must be before end date');
         return;
       }
       
       // Check if range is not too far in the future
       const now = new Date();
-      if (to > now) {
+      now.setHours(23, 59, 59, 999); // Set to end of today
+      if (normalizedTo > now) {
         alert('End date cannot be in the future');
         return;
       }
 
       // Check if range is not too old (max 1 year)
       const maxDays = 365;
-      const daysDiff = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+      const daysDiff = Math.ceil((normalizedTo.getTime() - normalizedFrom.getTime()) / (1000 * 60 * 60 * 24));
       if (daysDiff > maxDays) {
         alert(`Date range cannot exceed ${maxDays} days`);
         return;
@@ -96,8 +96,8 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
 
       onRangeChange({
         type: 'custom',
-        from,
-        to,
+        from: normalizedFrom,
+        to: normalizedTo,
         days: daysDiff,
       });
     }
@@ -106,12 +106,12 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
   const handleCustomDateCancel = () => {
     if (selectedRange.type !== 'custom') {
       setShowCustomPicker(false);
-      setFromDate('');
-      setToDate('');
+      setFromDate(null);
+      setToDate(null);
     } else {
       // Reset to previous custom dates
-      setFromDate(selectedRange.from ? selectedRange.from.toISOString().split('T')[0] : '');
-      setToDate(selectedRange.to ? selectedRange.to.toISOString().split('T')[0] : '');
+      setFromDate(selectedRange.from || null);
+      setToDate(selectedRange.to || null);
     }
   };
 
@@ -168,32 +168,14 @@ export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
               )}
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                  From Date
-                </label>
-                <Input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  max={toDate || new Date().toISOString().split('T')[0]}
-                  className="min-h-[44px] text-base sm:text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                  To Date
-                </label>
-                <Input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  min={fromDate}
-                  max={new Date().toISOString().split('T')[0]}
-                  className="min-h-[44px] text-base sm:text-sm"
-                />
-              </div>
+            <div className="w-full">
+              <DateRangePicker
+                fromDate={fromDate}
+                toDate={toDate}
+                onFromDateChange={setFromDate}
+                onToDateChange={setToDate}
+                maxDate={new Date()}
+              />
             </div>
 
             {selectedRange.type === 'custom' && formatDateRange() && (
