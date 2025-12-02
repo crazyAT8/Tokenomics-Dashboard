@@ -21,11 +21,11 @@ interface TimeRangeSelectorProps {
 }
 
 const PRESETS: { value: TimeRangePreset; label: string; days: number }[] = [
-  { value: '1d', label: '1 Day', days: 1 },
-  { value: '7d', label: '7 Days', days: 7 },
-  { value: '30d', label: '30 Days', days: 30 },
-  { value: '90d', label: '90 Days', days: 90 },
-  { value: '1y', label: '1 Year', days: 365 },
+  { value: '1d', label: '1D', days: 1 },
+  { value: '7d', label: '7D', days: 7 },
+  { value: '30d', label: '30D', days: 30 },
+  { value: '90d', label: '90D', days: 90 },
+  { value: '1y', label: '1Y', days: 365 },
 ];
 
 export const TimeRangeSelector: React.FC<TimeRangeSelectorProps> = ({
