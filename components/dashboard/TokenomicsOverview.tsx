@@ -4,6 +4,8 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { TokenomicsChart } from '@/components/charts/TokenomicsChart';
 import { TokenomicsData } from '@/lib/types';
+import { Currency } from '@/lib/store';
+import { formatCurrency } from '@/lib/utils/currency';
 import { 
   Coins, 
   TrendingUp, 
@@ -15,12 +17,17 @@ import {
 
 interface TokenomicsOverviewProps {
   tokenomics: TokenomicsData;
+  currency?: Currency;
 }
 
 export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
   tokenomics,
+  currency = 'usd',
 }) => {
-  const formatNumber = (num: number) => {
+  const formatNumber = (num: number, isCurrency: boolean = false) => {
+    if (isCurrency) {
+      return formatCurrency(num, currency);
+    }
     if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
     if (num >= 1e6) return `${(num / 1e6).toFixed(2)}M`;
     if (num >= 1e3) return `${(num / 1e3).toFixed(2)}K`;
@@ -31,12 +38,20 @@ export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
     ? (tokenomics.circulating_supply / tokenomics.max_supply) * 100 
     : 100;
 
-  const metrics = [
+  const metrics: Array<{
+    title: string;
+    value: number | string;
+    icon: React.ReactNode;
+    change?: number;
+    subtitle?: string;
+    isCurrency?: boolean;
+  }> = [
     {
       title: 'Market Cap',
       value: tokenomics.market_cap,
       icon: <DollarSign className="h-5 w-5" />,
       change: tokenomics.price_change_percentage_24h,
+      isCurrency: true,
     },
     {
       title: 'Circulating Supply',
@@ -58,6 +73,7 @@ export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
       title: '24h Volume',
       value: tokenomics.volume_24h,
       icon: <Activity className="h-5 w-5" />,
+      isCurrency: true,
     },
     {
       title: 'Market Cap Rank',
@@ -80,7 +96,7 @@ export const TokenomicsOverview: React.FC<TokenomicsOverviewProps> = ({
                   </p>
                   <p className="text-base sm:text-lg md:text-xl font-bold text-gray-900 break-words">
                     {typeof metric.value === 'number' 
-                      ? formatNumber(metric.value) 
+                      ? formatNumber(metric.value, metric.isCurrency) 
                       : metric.value
                     }
                   </p>

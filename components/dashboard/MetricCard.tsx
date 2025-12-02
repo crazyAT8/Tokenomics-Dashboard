@@ -3,6 +3,8 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Currency } from '@/lib/store';
+import { formatCurrency } from '@/lib/utils/currency';
 
 interface MetricCardProps {
   title: string;
@@ -11,6 +13,7 @@ interface MetricCardProps {
   changeType?: 'positive' | 'negative' | 'neutral';
   icon?: React.ReactNode;
   subtitle?: string;
+  currency?: Currency;
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({
@@ -20,13 +23,11 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   changeType = 'neutral',
   icon,
   subtitle,
+  currency = 'usd',
 }) => {
   const formatValue = (val: string | number) => {
     if (typeof val === 'number') {
-      if (val >= 1e9) return `$${(val / 1e9).toFixed(2)}B`;
-      if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`;
-      if (val >= 1e3) return `$${(val / 1e3).toFixed(2)}K`;
-      return `$${val.toFixed(2)}`;
+      return formatCurrency(val, currency);
     }
     return val;
   };

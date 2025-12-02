@@ -15,6 +15,7 @@ export const useCoinData = () => {
     networkStatus,
     retryCount,
     timeRange,
+    currency,
     setMarketData,
     setLoading,
     setError,
@@ -36,13 +37,14 @@ export const useCoinData = () => {
     return `${range.type}-${range.days || 7}`;
   }, []);
 
-  // Create a stable key for the current time range to track changes
+  // Create a stable key for the current time range and currency to track changes
   // Use individual properties to ensure proper reactivity
-  const currentTimeRangeKey = useMemo(() => getTimeRangeKey(timeRange), [
+  const currentTimeRangeKey = useMemo(() => `${getTimeRangeKey(timeRange)}-${currency}`, [
     timeRange.type,
     timeRange.days,
     timeRange.from?.getTime(),
     timeRange.to?.getTime(),
+    currency,
     getTimeRangeKey,
   ]);
 
@@ -56,8 +58,8 @@ export const useCoinData = () => {
       return;
     }
 
-    // Generate stable key for current request
-    const currentKey = getTimeRangeKey(timeRange);
+    // Generate stable key for current request (use the memoized key)
+    const currentKey = currentTimeRangeKey;
     const requestKey = `${selectedCoin}-${currentKey}`;
     
     // Skip if we're already fetching the same data
@@ -73,8 +75,9 @@ export const useCoinData = () => {
     try {
       console.log('Fetching data for coin:', selectedCoin, 'range:', currentKey);
       
-      // Build query parameters based on time range
+      // Build query parameters based on time range and currency
       const params = new URLSearchParams();
+      params.append('currency', currency);
       if (timeRange.type === 'custom' && timeRange.from && timeRange.to) {
         params.append('from', timeRange.from.toISOString());
         params.append('to', timeRange.to.toISOString());
@@ -116,10 +119,7 @@ export const useCoinData = () => {
     }
   }, [
     selectedCoin, 
-    timeRange.type,
-    timeRange.days,
-    timeRange.from?.getTime(),
-    timeRange.to?.getTime(),
+    currentTimeRangeKey,
     networkStatus.isOnline,
     setMarketData, 
     setLoading, 

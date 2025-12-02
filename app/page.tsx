@@ -7,6 +7,7 @@ import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { Header } from '@/components/dashboard/Header';
 import { CoinSelector } from '@/components/dashboard/CoinSelector';
 import { TimeRangeSelector } from '@/components/dashboard/TimeRangeSelector';
+import { CurrencySelector } from '@/components/dashboard/CurrencySelector';
 import { PriceChart } from '@/components/charts/PriceChart';
 import { TokenomicsOverview } from '@/components/dashboard/TokenomicsOverview';
 import { MetricCard } from '@/components/dashboard/MetricCard';
@@ -32,6 +33,8 @@ export default function Dashboard() {
     retryCount,
     timeRange,
     setTimeRange,
+    currency,
+    setCurrency,
   } = useDashboardStore();
   const { marketData, isLoading, error, errorDetails: hookErrorDetails, retryCount: hookRetryCount, refreshData } = useCoinData();
   const networkStatusHook = useNetworkStatus();
@@ -116,11 +119,15 @@ export default function Dashboard() {
       />
       
       <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-6 lg:py-8">
-        {/* Coin Selector */}
-        <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
+        {/* Coin and Currency Selectors */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4 md:mb-6 lg:mb-8">
           <CoinSelector
             selectedCoin={selectedCoin}
             onCoinSelect={setSelectedCoin}
+          />
+          <CurrencySelector
+            selectedCurrency={currency}
+            onCurrencySelect={setCurrency}
           />
         </div>
 
@@ -158,7 +165,7 @@ export default function Dashboard() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6 min-w-0">
-                    <PriceChart data={marketData.priceHistory} />
+                    <PriceChart data={marketData.priceHistory} currency={currency} />
                   </CardContent>
                 </Card>
               </div>
@@ -170,6 +177,7 @@ export default function Dashboard() {
                   change={marketData.coin.price_change_percentage_24h}
                   changeType={marketData.coin.price_change_percentage_24h >= 0 ? 'positive' : 'negative'}
                   icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  currency={currency}
                 />
                 
                 <MetricCard
@@ -178,31 +186,35 @@ export default function Dashboard() {
                   change={marketData.coin.market_cap_change_percentage_24h}
                   changeType={marketData.coin.market_cap_change_percentage_24h >= 0 ? 'positive' : 'negative'}
                   icon={<BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  currency={currency}
                 />
                 
                 <MetricCard
                   title="24h Volume"
                   value={marketData.coin.total_volume}
                   icon={<Activity className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  currency={currency}
                 />
                 
                 <MetricCard
                   title="24h High"
                   value={marketData.coin.high_24h}
                   icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  currency={currency}
                 />
                 
                 <MetricCard
                   title="24h Low"
                   value={marketData.coin.low_24h}
                   icon={<TrendingDown className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  currency={currency}
                 />
               </div>
             </div>
 
             {/* Tokenomics Overview */}
             <div className="order-3 min-w-0">
-              <TokenomicsOverview tokenomics={marketData.tokenomics} />
+              <TokenomicsOverview tokenomics={marketData.tokenomics} currency={currency} />
             </div>
           </>
         ) : null}

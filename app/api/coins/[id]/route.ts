@@ -10,11 +10,16 @@ export async function GET(
     console.log('API Route - coinId:', coinId, typeof coinId);
     const { searchParams } = new URL(request.url);
     
+    // Get currency parameter, default to 'usd'
+    const currency = searchParams.get('currency') || 'usd';
+    
     // Check for custom date range
     const fromParam = searchParams.get('from');
     const toParam = searchParams.get('to');
     
-    let priceHistoryOptions: { days?: number; from?: Date; to?: Date } = {};
+    let priceHistoryOptions: { days?: number; from?: Date; to?: Date; currency?: string } = {
+      currency,
+    };
     
     if (fromParam && toParam) {
       // Custom date range
@@ -27,7 +32,7 @@ export async function GET(
     }
 
     const [coinData, priceHistory] = await Promise.all([
-      fetchCoinData(coinId),
+      fetchCoinData(coinId, currency),
       fetchPriceHistory(coinId, priceHistoryOptions),
     ]);
 

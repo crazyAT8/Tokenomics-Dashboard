@@ -25,10 +25,11 @@ api.interceptors.response.use(
   }
 );
 
-export const fetchCoinData = async (coinId: string): Promise<CoinData> => {
+export const fetchCoinData = async (coinId: string, currency: string = 'usd'): Promise<CoinData> => {
   try {
     return await retry(async () => {
-      const response = await api.get(`/coins/${coinId}`, {
+      // First fetch the coin data
+      const coinResponse = await api.get(`/coins/${coinId}`, {
         params: {
           localization: false,
           tickers: false,
@@ -38,7 +39,49 @@ export const fetchCoinData = async (coinId: string): Promise<CoinData> => {
           sparkline: false,
         },
       });
-      return response.data;
+      
+      // Then fetch market data with the specified currency
+      const marketResponse = await api.get('/coins/markets', {
+        params: {
+          vs_currency: currency,
+          ids: coinId,
+          order: 'market_cap_desc',
+          per_page: 1,
+          page: 1,
+          sparkline: false,
+          price_change_percentage: '24h',
+        },
+      });
+      
+      // Merge the data, prioritizing market data for price-related fields
+      const coinData = coinResponse.data;
+      const marketData = marketResponse.data[0];
+      
+      if (marketData) {
+        return {
+          ...coinData,
+          current_price: marketData.current_price,
+          market_cap: marketData.market_cap,
+          market_cap_rank: marketData.market_cap_rank,
+          fully_diluted_valuation: marketData.fully_diluted_valuation,
+          total_volume: marketData.total_volume,
+          high_24h: marketData.high_24h,
+          low_24h: marketData.low_24h,
+          price_change_24h: marketData.price_change_24h,
+          price_change_percentage_24h: marketData.price_change_percentage_24h,
+          market_cap_change_24h: marketData.market_cap_change_24h,
+          market_cap_change_percentage_24h: marketData.market_cap_change_percentage_24h,
+          ath: marketData.ath,
+          ath_change_percentage: marketData.ath_change_percentage,
+          ath_date: marketData.ath_date,
+          atl: marketData.atl,
+          atl_change_percentage: marketData.atl_change_percentage,
+          atl_date: marketData.atl_date,
+          last_updated: marketData.last_updated,
+        };
+      }
+      
+      return coinData;
     }, {
       maxRetries: 3,
       initialDelay: 1000,
@@ -59,11 +102,12 @@ export const fetchPriceHistory = async (
     days?: number;
     from?: Date;
     to?: Date;
+    currency?: string;
   } = {}
 ): Promise<PriceHistory[]> => {
   try {
     return await retry(async () => {
-      const { days = 7, from, to } = options;
+      const { days = 7, from, to, currency = 'usd' } = options;
       
       // Calculate days if we have custom date range
       let calculatedDays = days;
@@ -75,7 +119,7 @@ export const fetchPriceHistory = async (
       // CoinGecko API limits: max 365 days for free tier, can use 'max' for all available data
       // For custom ranges, we'll use the calculated days
       const params: any = {
-        vs_currency: 'usd',
+        vs_currency: currency,
         days: calculatedDays > 365 ? 365 : calculatedDays, // Cap at 365 days
         interval: calculatedDays <= 1 ? 'hourly' : 'daily',
       };

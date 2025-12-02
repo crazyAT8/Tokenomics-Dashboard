@@ -11,13 +11,16 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { PriceHistory } from '@/lib/types';
+import { Currency } from '@/lib/store';
+import { formatCurrency, formatCurrencyFull, CURRENCY_INFO } from '@/lib/utils/currency';
 
 interface PriceChartProps {
   data: PriceHistory[];
   height?: number;
+  currency?: Currency;
 }
 
-export const PriceChart: React.FC<PriceChartProps> = ({ data, height }) => {
+export const PriceChart: React.FC<PriceChartProps> = ({ data, height, currency = 'usd' }) => {
   const [chartHeight, setChartHeight] = useState(height || 300);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -63,20 +66,29 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height }) => {
   };
 
   const formatYAxis = (value: number) => {
+    const info = CURRENCY_INFO[currency];
     if (isSmallMobile) {
-      if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
-      if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
-      if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
-      return `$${value.toFixed(0)}`;
+      if (value >= 1e9) return `${info.symbol}${(value / 1e9).toFixed(1)}B`;
+      if (value >= 1e6) return `${info.symbol}${(value / 1e6).toFixed(1)}M`;
+      if (value >= 1e3) return `${info.symbol}${(value / 1e3).toFixed(1)}K`;
+      // For JPY and KRW, don't show decimals for whole numbers
+      if ((currency === 'jpy' || currency === 'krw') && value >= 1) {
+        return `${info.symbol}${value.toFixed(0)}`;
+      }
+      return `${info.symbol}${value.toFixed(0)}`;
     }
     if (isMobile && value >= 1000) {
-      return `$${(value / 1000).toFixed(1)}K`;
+      return `${info.symbol}${(value / 1000).toFixed(1)}K`;
     }
-    return `$${value.toLocaleString()}`;
+    // For JPY and KRW, don't show decimals
+    if (currency === 'jpy' || currency === 'krw') {
+      return `${info.symbol}${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    }
+    return `${info.symbol}${value.toLocaleString()}`;
   };
 
   const formatTooltip = (value: number, name: string) => {
-    return [`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Price'];
+    return [formatCurrencyFull(value, currency), 'Price'];
   };
 
   // Adjust margins for different screen sizes

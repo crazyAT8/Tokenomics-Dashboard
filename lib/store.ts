@@ -3,6 +3,8 @@ import { DashboardState, MarketData } from './types';
 import { ApiError } from './utils/errorHandler';
 import { TimeRange } from '@/components/dashboard/TimeRangeSelector';
 
+export type Currency = 'usd' | 'eur' | 'gbp' | 'jpy' | 'cad' | 'aud' | 'chf' | 'cny' | 'inr' | 'krw';
+
 interface ExtendedDashboardState extends DashboardState {
   networkStatus: {
     isOnline: boolean;
@@ -11,6 +13,7 @@ interface ExtendedDashboardState extends DashboardState {
   errorDetails: ApiError | null;
   retryCount: number;
   timeRange: TimeRange;
+  currency: Currency;
 }
 
 interface DashboardStore extends ExtendedDashboardState {
@@ -24,6 +27,7 @@ interface DashboardStore extends ExtendedDashboardState {
   incrementRetryCount: () => void;
   resetRetryCount: () => void;
   setTimeRange: (range: TimeRange) => void;
+  setCurrency: (currency: Currency) => void;
 }
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
@@ -39,6 +43,7 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   },
   retryCount: 0,
   timeRange: { type: '7d', days: 7 },
+  currency: 'usd',
 
   setSelectedCoin: (coin) => set({ selectedCoin: coin }),
   setMarketData: (data) => set({ marketData: data, error: null, errorDetails: null, retryCount: 0 }),
@@ -51,4 +56,5 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   incrementRetryCount: () => set((state) => ({ retryCount: state.retryCount + 1 })),
   resetRetryCount: () => set({ retryCount: 0 }),
   setTimeRange: (range) => set({ timeRange: range }),
+  setCurrency: (currency) => set({ currency }),
 }));
