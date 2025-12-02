@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useMemo } from 'react';
 import { useDashboardStore } from '@/lib/store';
 import { parseError } from '@/lib/utils/errorHandler';
 import { retry } from '@/lib/utils/retry';
@@ -36,6 +36,16 @@ export const useCoinData = () => {
     return `${range.type}-${range.days || 7}`;
   }, []);
 
+  // Create a stable key for the current time range to track changes
+  // Use individual properties to ensure proper reactivity
+  const currentTimeRangeKey = useMemo(() => getTimeRangeKey(timeRange), [
+    timeRange.type,
+    timeRange.days,
+    timeRange.from?.getTime(),
+    timeRange.to?.getTime(),
+    getTimeRangeKey,
+  ]);
+
   const fetchCoinData = useCallback(async () => {
     if (!selectedCoin) return;
     
@@ -52,6 +62,7 @@ export const useCoinData = () => {
     
     // Skip if we're already fetching the same data
     if (lastFetchRef.current?.coin === selectedCoin && lastFetchRef.current?.key === currentKey) {
+      console.log('Skipping fetch - same data already loaded:', requestKey);
       return;
     }
 
@@ -128,15 +139,18 @@ export const useCoinData = () => {
       clearTimeout(debounceTimeoutRef.current);
     }
 
-    const currentKey = getTimeRangeKey(timeRange);
+    const currentKey = currentTimeRangeKey;
     
     // Only fetch if the key actually changed
     if (lastFetchRef.current?.coin === selectedCoin && lastFetchRef.current?.key === currentKey) {
+      console.log('Skipping fetch - key unchanged:', currentKey);
       return;
     }
 
     // Update the ref to track the current key
     timeRangeKeyRef.current = currentKey;
+
+    console.log('Time range changed, scheduling fetch. Coin:', selectedCoin, 'Key:', currentKey);
 
     // Debounce: wait 300ms before fetching to prevent rapid API calls
     debounceTimeoutRef.current = setTimeout(() => {
@@ -148,7 +162,7 @@ export const useCoinData = () => {
         clearTimeout(debounceTimeoutRef.current);
       }
     };
-  }, [selectedCoin, timeRange.type, timeRange.days, timeRange.from?.getTime(), timeRange.to?.getTime(), getTimeRangeKey, fetchCoinData]);
+  }, [selectedCoin, currentTimeRangeKey, fetchCoinData]);
 
   const refreshData = useCallback(() => {
     fetchCoinData();
