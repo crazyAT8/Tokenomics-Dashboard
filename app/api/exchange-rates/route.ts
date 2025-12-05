@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchExchangeRates } from '@/lib/api';
+import { validateExchangeRates } from '@/lib/validation/validators';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +9,10 @@ export async function GET(request: NextRequest) {
     
     const exchangeRates = await fetchExchangeRates(baseCurrency);
     
-    return NextResponse.json(exchangeRates);
+    // Validate the exchange rates before sending (extra safety layer)
+    const validatedExchangeRates = validateExchangeRates(exchangeRates);
+    
+    return NextResponse.json(validatedExchangeRates);
   } catch (error: any) {
     console.error('API Error:', error);
     const statusCode = error.parsedError?.statusCode || error.response?.status || 500;

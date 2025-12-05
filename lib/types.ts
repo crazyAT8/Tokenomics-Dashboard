@@ -6,35 +6,35 @@ export interface CoinData {
   current_price: number;
   market_cap: number;
   market_cap_rank: number;
-  fully_diluted_valuation: number;
+  fully_diluted_valuation: number | null;
   total_volume: number;
-  high_24h: number;
-  low_24h: number;
-  price_change_24h: number;
-  price_change_percentage_24h: number;
-  market_cap_change_24h: number;
-  market_cap_change_percentage_24h: number;
-  circulating_supply: number;
-  total_supply: number;
-  max_supply: number;
-  ath: number;
-  ath_change_percentage: number;
+  high_24h: number | null;
+  low_24h: number | null;
+  price_change_24h: number | null;
+  price_change_percentage_24h: number | null;
+  market_cap_change_24h: number | null;
+  market_cap_change_percentage_24h: number | null;
+  circulating_supply: number | null;
+  total_supply: number | null;
+  max_supply: number | null;
+  ath: number | null;
+  ath_change_percentage: number | null;
   ath_date: string;
-  atl: number;
-  atl_change_percentage: number;
+  atl: number | null;
+  atl_change_percentage: number | null;
   atl_date: string;
   last_updated: string;
 }
 
 export interface TokenomicsData {
-  circulating_supply: number;
-  total_supply: number;
-  max_supply: number;
+  circulating_supply: number | null;
+  total_supply: number | null;
+  max_supply: number | null;
   market_cap: number;
-  fully_diluted_valuation: number;
+  fully_diluted_valuation: number | null;
   price: number;
-  price_change_24h: number;
-  price_change_percentage_24h: number;
+  price_change_24h: number | null;
+  price_change_percentage_24h: number | null;
   volume_24h: number;
   market_cap_rank: number;
 }

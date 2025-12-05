@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchCoinData, fetchPriceHistory } from '@/lib/api';
+import { validateMarketData } from '@/lib/validation/validators';
 
 export async function GET(
   request: NextRequest,
@@ -53,7 +54,10 @@ export async function GET(
       },
     };
 
-    return NextResponse.json(marketData);
+    // Validate the final market data before sending
+    const validatedMarketData = validateMarketData(marketData);
+
+    return NextResponse.json(validatedMarketData);
   } catch (error: any) {
     console.error('API Error:', error);
     const statusCode = error.parsedError?.statusCode || error.response?.status || 500;

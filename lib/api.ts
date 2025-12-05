@@ -2,6 +2,17 @@ import axios, { AxiosError } from 'axios';
 import { CoinData, PriceHistory, ExchangeRates } from './types';
 import { retry } from './utils/retry';
 import { parseError, getUserFriendlyErrorMessage } from './utils/errorHandler';
+import {
+  validateCoinData,
+  validatePriceHistory,
+  validateExchangeRates,
+  validateCoinGeckoCoinResponse,
+  validateCoinGeckoMarketResponse,
+  validateCoinGeckoMarketChartResponse,
+  validateCoinGeckoSearchResponse,
+  validateExchangeRateApiResponse,
+  ValidationError,
+} from './validation/validators';
 
 const COINGECKO_API_URL = process.env.COINGECKO_API_URL || 'https://api.coingecko.com/api/v3';
 const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY;
@@ -40,6 +51,9 @@ export const fetchCoinData = async (coinId: string, currency: string = 'usd'): P
         },
       });
       
+      // Validate raw API response
+      validateCoinGeckoCoinResponse(coinResponse.data);
+      
       // Then fetch market data with the specified currency
       const marketResponse = await api.get('/coins/markets', {
         params: {
@@ -53,41 +67,101 @@ export const fetchCoinData = async (coinId: string, currency: string = 'usd'): P
         },
       });
       
+      // Validate raw market API response
+      const validatedMarketResponse = validateCoinGeckoMarketResponse(marketResponse.data);
+      
       // Merge the data, prioritizing market data for price-related fields
       const coinData = coinResponse.data;
-      const marketData = marketResponse.data[0];
+      const marketData = validatedMarketResponse[0];
+      
+      let mergedData: CoinData;
       
       if (marketData) {
-        return {
-          ...coinData,
-          current_price: marketData.current_price,
-          market_cap: marketData.market_cap,
-          market_cap_rank: marketData.market_cap_rank,
-          fully_diluted_valuation: marketData.fully_diluted_valuation,
-          total_volume: marketData.total_volume,
-          high_24h: marketData.high_24h,
-          low_24h: marketData.low_24h,
-          price_change_24h: marketData.price_change_24h,
-          price_change_percentage_24h: marketData.price_change_percentage_24h,
-          market_cap_change_24h: marketData.market_cap_change_24h,
-          market_cap_change_percentage_24h: marketData.market_cap_change_percentage_24h,
-          ath: marketData.ath,
-          ath_change_percentage: marketData.ath_change_percentage,
-          ath_date: marketData.ath_date,
-          atl: marketData.atl,
-          atl_change_percentage: marketData.atl_change_percentage,
-          atl_date: marketData.atl_date,
-          last_updated: marketData.last_updated,
+        // Extract image from coinData (could be in image object or direct string)
+        const image = coinData.image?.large || coinData.image?.small || coinData.image?.thumb || coinData.image || '';
+        
+        mergedData = {
+          id: coinData.id,
+          symbol: coinData.symbol,
+          name: coinData.name,
+          image: typeof image === 'string' ? image : '',
+          current_price: marketData.current_price ?? 0,
+          market_cap: marketData.market_cap ?? 0,
+          market_cap_rank: marketData.market_cap_rank ?? 0,
+          fully_diluted_valuation: marketData.fully_diluted_valuation ?? null,
+          total_volume: marketData.total_volume ?? 0,
+          high_24h: marketData.high_24h ?? null,
+          low_24h: marketData.low_24h ?? null,
+          price_change_24h: marketData.price_change_24h ?? null,
+          price_change_percentage_24h: marketData.price_change_percentage_24h ?? null,
+          market_cap_change_24h: marketData.market_cap_change_24h ?? null,
+          market_cap_change_percentage_24h: marketData.market_cap_change_percentage_24h ?? null,
+          circulating_supply: marketData.circulating_supply ?? coinData.market_data?.circulating_supply ?? null,
+          total_supply: marketData.total_supply ?? coinData.market_data?.total_supply ?? null,
+          max_supply: marketData.max_supply ?? coinData.market_data?.max_supply ?? null,
+          ath: marketData.ath ?? null,
+          ath_change_percentage: marketData.ath_change_percentage ?? null,
+          ath_date: marketData.ath_date ?? '',
+          atl: marketData.atl ?? null,
+          atl_change_percentage: marketData.atl_change_percentage ?? null,
+          atl_date: marketData.atl_date ?? '',
+          last_updated: marketData.last_updated ?? coinData.market_data?.last_updated ?? new Date().toISOString(),
+        };
+      } else {
+        // Fallback to coinData only
+        const marketDataFromCoin = coinData.market_data;
+        const image = coinData.image?.large || coinData.image?.small || coinData.image?.thumb || coinData.image || '';
+        
+        mergedData = {
+          id: coinData.id,
+          symbol: coinData.symbol,
+          name: coinData.name,
+          image: typeof image === 'string' ? image : '',
+          current_price: marketDataFromCoin?.current_price?.[currency] ?? 0,
+          market_cap: marketDataFromCoin?.market_cap?.[currency] ?? 0,
+          market_cap_rank: marketDataFromCoin?.market_cap_rank ?? 0,
+          fully_diluted_valuation: marketDataFromCoin?.fully_diluted_valuation?.[currency] ?? null,
+          total_volume: marketDataFromCoin?.total_volume?.[currency] ?? 0,
+          high_24h: marketDataFromCoin?.high_24h?.[currency] ?? null,
+          low_24h: marketDataFromCoin?.low_24h?.[currency] ?? null,
+          price_change_24h: marketDataFromCoin?.price_change_24h ?? null,
+          price_change_percentage_24h: marketDataFromCoin?.price_change_percentage_24h ?? null,
+          market_cap_change_24h: marketDataFromCoin?.market_cap_change_24h ?? null,
+          market_cap_change_percentage_24h: marketDataFromCoin?.market_cap_change_percentage_24h ?? null,
+          circulating_supply: marketDataFromCoin?.circulating_supply ?? null,
+          total_supply: marketDataFromCoin?.total_supply ?? null,
+          max_supply: marketDataFromCoin?.max_supply ?? null,
+          ath: marketDataFromCoin?.ath?.[currency] ?? null,
+          ath_change_percentage: marketDataFromCoin?.ath_change_percentage?.[currency] ?? null,
+          ath_date: marketDataFromCoin?.ath_date?.[currency] ?? '',
+          atl: marketDataFromCoin?.atl?.[currency] ?? null,
+          atl_change_percentage: marketDataFromCoin?.atl_change_percentage?.[currency] ?? null,
+          atl_date: marketDataFromCoin?.atl_date?.[currency] ?? '',
+          last_updated: marketDataFromCoin?.last_updated ?? new Date().toISOString(),
         };
       }
       
-      return coinData;
+      // Validate the final merged data
+      return validateCoinData(mergedData);
     }, {
       maxRetries: 3,
       initialDelay: 1000,
     });
   } catch (error: any) {
     console.error('Error fetching coin data:', error);
+    
+    // Handle validation errors
+    if (error instanceof ValidationError) {
+      const validationError = new Error(`Data validation failed: ${error.message}`);
+      (validationError as any).parsedError = {
+        message: error.message,
+        statusCode: 500,
+        retryable: false,
+        type: 'validation_error',
+      };
+      throw validationError;
+    }
+    
     const parsedError = error.parsedError || parseError(error);
     const message = getUserFriendlyErrorMessage(parsedError);
     const enhancedError = new Error(message);
@@ -128,11 +202,16 @@ export const fetchPriceHistory = async (
         params,
       });
       
+      // Validate raw API response
+      const validatedResponse = validateCoinGeckoMarketChartResponse(response.data);
+      
       // Filter the results to match the custom date range if provided
-      let prices = response.data.prices.map(([timestamp, price]: [number, number]) => ({
-        timestamp,
-        price,
-      }));
+      let prices = validatedResponse.prices
+        .filter(([timestamp, price]) => timestamp && price && price > 0)
+        .map(([timestamp, price]) => ({
+          timestamp,
+          price,
+        }));
 
       // If custom date range is provided, filter the results
       if (from && to) {
@@ -143,13 +222,27 @@ export const fetchPriceHistory = async (
         );
       }
       
-      return prices;
+      // Validate the final price history array
+      return validatePriceHistory(prices);
     }, {
       maxRetries: 3,
       initialDelay: 1000,
     });
   } catch (error: any) {
     console.error('Error fetching price history:', error);
+    
+    // Handle validation errors
+    if (error instanceof ValidationError) {
+      const validationError = new Error(`Data validation failed: ${error.message}`);
+      (validationError as any).parsedError = {
+        message: error.message,
+        statusCode: 500,
+        retryable: false,
+        type: 'validation_error',
+      };
+      throw validationError;
+    }
+    
     const parsedError = error.parsedError || parseError(error);
     const message = getUserFriendlyErrorMessage(parsedError);
     const enhancedError = new Error(message);
@@ -171,13 +264,63 @@ export const fetchTopCoins = async (limit: number = 10): Promise<CoinData[]> => 
           price_change_percentage: '24h',
         },
       });
-      return response.data;
+      
+      // Validate raw API response
+      const validatedResponse = validateCoinGeckoMarketResponse(response.data);
+      
+      // Transform and validate each coin
+      const coins = validatedResponse.map((marketData) => {
+        const coinData: CoinData = {
+          id: marketData.id,
+          symbol: marketData.symbol,
+          name: marketData.name,
+          image: marketData.image || '',
+          current_price: marketData.current_price ?? 0,
+          market_cap: marketData.market_cap ?? 0,
+          market_cap_rank: marketData.market_cap_rank ?? 0,
+          fully_diluted_valuation: marketData.fully_diluted_valuation ?? null,
+          total_volume: marketData.total_volume ?? 0,
+          high_24h: marketData.high_24h ?? null,
+          low_24h: marketData.low_24h ?? null,
+          price_change_24h: marketData.price_change_24h ?? null,
+          price_change_percentage_24h: marketData.price_change_percentage_24h ?? null,
+          market_cap_change_24h: marketData.market_cap_change_24h ?? null,
+          market_cap_change_percentage_24h: marketData.market_cap_change_percentage_24h ?? null,
+          circulating_supply: marketData.circulating_supply ?? null,
+          total_supply: marketData.total_supply ?? null,
+          max_supply: marketData.max_supply ?? null,
+          ath: marketData.ath ?? null,
+          ath_change_percentage: marketData.ath_change_percentage ?? null,
+          ath_date: marketData.ath_date ?? '',
+          atl: marketData.atl ?? null,
+          atl_change_percentage: marketData.atl_change_percentage ?? null,
+          atl_date: marketData.atl_date ?? '',
+          last_updated: marketData.last_updated ?? new Date().toISOString(),
+        };
+        
+        return validateCoinData(coinData);
+      });
+      
+      return coins;
     }, {
       maxRetries: 3,
       initialDelay: 1000,
     });
   } catch (error: any) {
     console.error('Error fetching top coins:', error);
+    
+    // Handle validation errors
+    if (error instanceof ValidationError) {
+      const validationError = new Error(`Data validation failed: ${error.message}`);
+      (validationError as any).parsedError = {
+        message: error.message,
+        statusCode: 500,
+        retryable: false,
+        type: 'validation_error',
+      };
+      throw validationError;
+    }
+    
     const parsedError = error.parsedError || parseError(error);
     const message = getUserFriendlyErrorMessage(parsedError);
     const enhancedError = new Error(message);
@@ -194,39 +337,63 @@ export const searchCoins = async (query: string): Promise<CoinData[]> => {
           query,
         },
       });
-      return response.data.coins.map((coin: any) => ({
-        id: coin.id,
-        symbol: coin.symbol,
-        name: coin.name,
-        image: coin.thumb,
-        current_price: 0,
-        market_cap: 0,
-        market_cap_rank: coin.market_cap_rank || 0,
-        fully_diluted_valuation: 0,
-        total_volume: 0,
-        high_24h: 0,
-        low_24h: 0,
-        price_change_24h: 0,
-        price_change_percentage_24h: 0,
-        market_cap_change_24h: 0,
-        market_cap_change_percentage_24h: 0,
-        circulating_supply: 0,
-        total_supply: 0,
-        max_supply: 0,
-        ath: 0,
-        ath_change_percentage: 0,
-        ath_date: '',
-        atl: 0,
-        atl_change_percentage: 0,
-        atl_date: '',
-        last_updated: '',
-      }));
+      
+      // Validate raw API response
+      const validatedResponse = validateCoinGeckoSearchResponse(response.data);
+      
+      // Transform and validate each coin
+      const coins = validatedResponse.coins.map((coin) => {
+        const coinData: CoinData = {
+          id: coin.id,
+          symbol: coin.symbol,
+          name: coin.name,
+          image: coin.thumb || '',
+          current_price: 0,
+          market_cap: 0,
+          market_cap_rank: coin.market_cap_rank ?? 0,
+          fully_diluted_valuation: 0,
+          total_volume: 0,
+          high_24h: 0,
+          low_24h: 0,
+          price_change_24h: 0,
+          price_change_percentage_24h: 0,
+          market_cap_change_24h: 0,
+          market_cap_change_percentage_24h: 0,
+          circulating_supply: 0,
+          total_supply: 0,
+          max_supply: 0,
+          ath: 0,
+          ath_change_percentage: 0,
+          ath_date: '',
+          atl: 0,
+          atl_change_percentage: 0,
+          atl_date: '',
+          last_updated: '',
+        };
+        
+        return validateCoinData(coinData);
+      });
+      
+      return coins;
     }, {
       maxRetries: 2, // Fewer retries for search to avoid delays
       initialDelay: 500,
     });
   } catch (error: any) {
     console.error('Error searching coins:', error);
+    
+    // Handle validation errors
+    if (error instanceof ValidationError) {
+      const validationError = new Error(`Data validation failed: ${error.message}`);
+      (validationError as any).parsedError = {
+        message: error.message,
+        statusCode: 500,
+        retryable: false,
+        type: 'validation_error',
+      };
+      throw validationError;
+    }
+    
     const parsedError = error.parsedError || parseError(error);
     const message = getUserFriendlyErrorMessage(parsedError);
     const enhancedError = new Error(message);
@@ -245,19 +412,37 @@ export const fetchExchangeRates = async (baseCurrency: string = 'usd'): Promise<
         timeout: 5000,
       });
       
-      return {
+      // Validate raw API response
+      const validatedResponse = validateExchangeRateApiResponse(response.data);
+      
+      // Transform to our ExchangeRates format
+      const exchangeRates: ExchangeRates = {
         base: base.toLowerCase(),
-        rates: response.data.rates,
-        timestamp: Date.now(),
+        rates: validatedResponse.rates,
+        timestamp: validatedResponse.timestamp ?? Date.now(),
       };
+      
+      // Validate the final exchange rates
+      return validateExchangeRates(exchangeRates);
     }, {
       maxRetries: 2,
       initialDelay: 500,
     });
   } catch (error: any) {
     console.error('Error fetching exchange rates:', error);
-    // Fallback: return rates based on USD if the API fails
-    // This is a simple fallback - in production you might want better error handling
+    
+    // Handle validation errors
+    if (error instanceof ValidationError) {
+      const validationError = new Error(`Data validation failed: ${error.message}`);
+      (validationError as any).parsedError = {
+        message: error.message,
+        statusCode: 500,
+        retryable: false,
+        type: 'validation_error',
+      };
+      throw validationError;
+    }
+    
     const parsedError = error.parsedError || parseError(error);
     const message = getUserFriendlyErrorMessage(parsedError);
     const enhancedError = new Error(message);
