@@ -1,18 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchCoinData, fetchPriceHistory } from '@/lib/api';
 import { validateMarketData } from '@/lib/validation/validators';
+import { sanitizeCoinId, sanitizeCurrency, sanitizeNumber, sanitizeDate } from '@/lib/utils/sanitize';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const coinId = params.id;
+    // Sanitize coin ID from URL parameter
+    const coinId = sanitizeCoinId(params.id);
+    if (!coinId) {
+      return NextResponse.json(
+        { error: 'Invalid coin ID' },
+        { status: 400 }
+      );
+    }
+    
     console.log('API Route - coinId:', coinId, typeof coinId);
     const { searchParams } = new URL(request.url);
     
-    // Get currency parameter, default to 'usd'
-    const currency = searchParams.get('currency') || 'usd';
+    // Sanitize currency parameter
+    const currency = sanitizeCurrency(searchParams.get('currency'));
     
     // Check for custom date range
     const fromParam = searchParams.get('from');
@@ -23,12 +32,35 @@ export async function GET(
     };
     
     if (fromParam && toParam) {
-      // Custom date range
-      priceHistoryOptions.from = new Date(fromParam);
-      priceHistoryOptions.to = new Date(toParam);
+      // Sanitize and validate custom date range
+      const from = sanitizeDate(fromParam, { maxDate: new Date() });
+      const to = sanitizeDate(toParam, { maxDate: new Date() });
+      
+      if (!from || !to || from >= to) {
+        return NextResponse.json(
+          { error: 'Invalid date range' },
+          { status: 400 }
+        );
+      }
+      
+      priceHistoryOptions.from = from;
+      priceHistoryOptions.to = to;
     } else {
-      // Use days parameter
-      const days = parseInt(searchParams.get('days') || '7');
+      // Sanitize days parameter
+      const days = sanitizeNumber(searchParams.get('days') || '7', {
+        min: 1,
+        max: 365,
+        integer: true,
+        allowNegative: false,
+      });
+      
+      if (days === null) {
+        return NextResponse.json(
+          { error: 'Invalid days parameter' },
+          { status: 400 }
+        );
+      }
+      
       priceHistoryOptions.days = days;
     }
 

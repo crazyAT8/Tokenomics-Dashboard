@@ -1,11 +1,31 @@
 import { z } from 'zod';
+import { sanitizeString, sanitizeUrl, sanitizeCoinId } from '@/lib/utils/sanitize';
+
+// Helper to create sanitized string schema
+const sanitizedString = (minLength: number = 1) => 
+  z.string().transform((val) => sanitizeString(val, { maxLength: 1000 })).refine((val) => val.length >= minLength, {
+    message: `String must be at least ${minLength} character(s)`,
+  });
+
+// Helper to create sanitized URL schema
+const sanitizedUrl = () => 
+  z.string().transform((val) => sanitizeUrl(val) || '').refine((val) => val.length === 0 || val.startsWith('http'), {
+    message: 'Invalid URL format',
+  });
 
 // CoinData validation schema
 export const CoinDataSchema = z.object({
-  id: z.string().min(1),
-  symbol: z.string().min(1),
-  name: z.string().min(1),
-  image: z.string().url().or(z.string().length(0)), // Allow empty string for image
+  id: z.string().transform((val) => sanitizeCoinId(val)).refine((val) => val.length > 0, {
+    message: 'Coin ID is required',
+  }),
+  symbol: sanitizedString(1),
+  name: sanitizedString(1),
+  image: z.string().transform((val) => {
+    const sanitized = sanitizeUrl(val);
+    return sanitized || ''; // Allow empty string for image
+  }).refine((val) => val.length === 0 || val.startsWith('http'), {
+    message: 'Invalid image URL',
+  }),
   current_price: z.number().finite(),
   market_cap: z.number().finite().nonnegative(),
   market_cap_rank: z.number().int().nonnegative(),
@@ -22,11 +42,11 @@ export const CoinDataSchema = z.object({
   max_supply: z.number().finite().nonnegative().nullable(),
   ath: z.number().finite().nonnegative().nullable(),
   ath_change_percentage: z.number().finite().nullable(),
-  ath_date: z.string(),
+  ath_date: sanitizedString(0),
   atl: z.number().finite().nonnegative().nullable(),
   atl_change_percentage: z.number().finite().nullable(),
-  atl_date: z.string(),
-  last_updated: z.string(),
+  atl_date: sanitizedString(0),
+  last_updated: sanitizedString(0),
 });
 
 // PriceHistory validation schema
@@ -61,20 +81,26 @@ export const MarketDataSchema = z.object({
 
 // ExchangeRates validation schema
 export const ExchangeRatesSchema = z.object({
-  base: z.string().min(1),
-  rates: z.record(z.string(), z.number().finite().positive()),
+  base: z.string().transform((val) => sanitizeString(val, { maxLength: 10 }).toLowerCase()).refine((val) => val.length > 0, {
+    message: 'Base currency is required',
+  }),
+  rates: z.record(
+    z.string().transform((val) => sanitizeString(val, { maxLength: 10 }).toUpperCase()),
+    z.number().finite().positive()
+  ),
   timestamp: z.number().int().positive(),
 });
 
 // CoinGecko API response schemas (for raw API responses)
+// Note: These schemas are for raw API responses, so we sanitize during transformation
 export const CoinGeckoCoinResponseSchema = z.object({
-  id: z.string(),
-  symbol: z.string(),
-  name: z.string(),
+  id: z.string().transform((val) => sanitizeCoinId(val)),
+  symbol: z.string().transform((val) => sanitizeString(val)),
+  name: z.string().transform((val) => sanitizeString(val)),
   image: z.object({
-    thumb: z.string().optional(),
-    small: z.string().optional(),
-    large: z.string().optional(),
+    thumb: z.string().optional().transform((val) => val ? sanitizeUrl(val) || '' : ''),
+    small: z.string().optional().transform((val) => val ? sanitizeUrl(val) || '' : ''),
+    large: z.string().optional().transform((val) => val ? sanitizeUrl(val) || '' : ''),
   }).optional(),
   market_data: z.object({
     current_price: z.record(z.string(), z.number()).optional(),
@@ -103,10 +129,10 @@ export const CoinGeckoCoinResponseSchema = z.object({
 
 export const CoinGeckoMarketResponseSchema = z.array(
   z.object({
-    id: z.string(),
-    symbol: z.string(),
-    name: z.string(),
-    image: z.string().optional(),
+    id: z.string().transform((val) => sanitizeCoinId(val)),
+    symbol: z.string().transform((val) => sanitizeString(val)),
+    name: z.string().transform((val) => sanitizeString(val)),
+    image: z.string().optional().transform((val) => val ? sanitizeUrl(val) || '' : ''),
     current_price: z.number().nullable(),
     market_cap: z.number().nullable(),
     market_cap_rank: z.number().nullable(),
@@ -140,10 +166,10 @@ export const CoinGeckoMarketChartResponseSchema = z.object({
 export const CoinGeckoSearchResponseSchema = z.object({
   coins: z.array(
     z.object({
-      id: z.string(),
-      name: z.string(),
-      symbol: z.string(),
-      thumb: z.string().optional(),
+      id: z.string().transform((val) => sanitizeCoinId(val)),
+      name: z.string().transform((val) => sanitizeString(val)),
+      symbol: z.string().transform((val) => sanitizeString(val)),
+      thumb: z.string().optional().transform((val) => val ? sanitizeUrl(val) || '' : ''),
       market_cap_rank: z.number().nullable().optional(),
     }).passthrough()
   ),
@@ -151,9 +177,12 @@ export const CoinGeckoSearchResponseSchema = z.object({
 
 // ExchangeRate API response schema
 export const ExchangeRateApiResponseSchema = z.object({
-  base: z.string(),
-  date: z.string().optional(),
-  rates: z.record(z.string(), z.number()),
+  base: z.string().transform((val) => sanitizeString(val, { maxLength: 10 }).toUpperCase()),
+  date: z.string().optional().transform((val) => val ? sanitizeString(val) : undefined),
+  rates: z.record(
+    z.string().transform((val) => sanitizeString(val, { maxLength: 10 }).toUpperCase()),
+    z.number()
+  ),
   success: z.boolean().optional(),
   timestamp: z.number().optional(),
 }).passthrough();

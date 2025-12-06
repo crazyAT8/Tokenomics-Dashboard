@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchExchangeRates } from '@/lib/api';
 import { validateExchangeRates } from '@/lib/validation/validators';
+import { sanitizeCurrency } from '@/lib/utils/sanitize';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const baseCurrency = searchParams.get('base') || 'usd';
+    
+    // Sanitize base currency parameter
+    const baseCurrency = sanitizeCurrency(searchParams.get('base'));
     
     const exchangeRates = await fetchExchangeRates(baseCurrency);
     

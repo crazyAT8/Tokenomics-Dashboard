@@ -24,6 +24,7 @@ import {
   AlertCircle,
   RefreshCw
 } from 'lucide-react';
+import { sanitizeUrl, escapeHtml } from '@/lib/utils/sanitize';
 
 export default function Dashboard() {
   const { 
@@ -72,7 +73,7 @@ export default function Dashboard() {
                 ? 'Rate Limit Exceeded'
                 : 'Error Loading Data'}
             </h2>
-            <p className="text-sm sm:text-base text-gray-600 mb-2 break-words">{error}</p>
+            <p className="text-sm sm:text-base text-gray-600 mb-2 break-words">{escapeHtml(error)}</p>
             {displayErrorDetails && (
               <div className="text-xs sm:text-sm text-gray-500 mb-4">
                 {displayErrorDetails.isNetworkError && (
@@ -170,11 +171,11 @@ export default function Dashboard() {
                   <CardHeader className="p-3 sm:p-4 md:p-5 lg:p-6">
                     <CardTitle className="flex items-center text-sm sm:text-base md:text-lg">
                       <img
-                        src={marketData.coin.image}
-                        alt={marketData.coin.name}
+                        src={sanitizeUrl(marketData.coin.image)}
+                        alt={escapeHtml(marketData.coin.name)}
                         className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mr-2 sm:mr-3 rounded-full flex-shrink-0"
                       />
-                      <span className="truncate">{marketData.coin.name} Price Chart</span>
+                      <span className="truncate">{escapeHtml(marketData.coin.name)} Price Chart</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6 min-w-0">
@@ -187,8 +188,8 @@ export default function Dashboard() {
                 <MetricCard
                   title="Current Price"
                   value={marketData.coin.current_price}
-                  change={marketData.coin.price_change_percentage_24h}
-                  changeType={marketData.coin.price_change_percentage_24h >= 0 ? 'positive' : 'negative'}
+                  change={marketData.coin.price_change_percentage_24h ?? undefined}
+                  changeType={marketData.coin.price_change_percentage_24h !== null && marketData.coin.price_change_percentage_24h >= 0 ? 'positive' : 'negative'}
                   icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />}
                   currency={currency}
                 />
@@ -196,8 +197,8 @@ export default function Dashboard() {
                 <MetricCard
                   title="Market Cap"
                   value={marketData.coin.market_cap}
-                  change={marketData.coin.market_cap_change_percentage_24h}
-                  changeType={marketData.coin.market_cap_change_percentage_24h >= 0 ? 'positive' : 'negative'}
+                  change={marketData.coin.market_cap_change_percentage_24h ?? undefined}
+                  changeType={marketData.coin.market_cap_change_percentage_24h !== null && marketData.coin.market_cap_change_percentage_24h >= 0 ? 'positive' : 'negative'}
                   icon={<BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />}
                   currency={currency}
                 />
@@ -211,14 +212,14 @@ export default function Dashboard() {
                 
                 <MetricCard
                   title="24h High"
-                  value={marketData.coin.high_24h}
+                  value={marketData.coin.high_24h ?? 0}
                   icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
                   currency={currency}
                 />
                 
                 <MetricCard
                   title="24h Low"
-                  value={marketData.coin.low_24h}
+                  value={marketData.coin.low_24h ?? 0}
                   icon={<TrendingDown className="h-4 w-4 sm:h-5 sm:w-5" />}
                   currency={currency}
                 />

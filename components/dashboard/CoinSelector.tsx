@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { CoinData } from '@/lib/types';
+import { sanitizeSearchQuery, sanitizeUrl, escapeHtml } from '@/lib/utils/sanitize';
 
 interface CoinSelectorProps {
   selectedCoin: string;
@@ -27,8 +28,10 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
   const fetchCoins = async (query: string = '') => {
     setIsLoading(true);
     try {
-      console.log('CoinSelector - fetching coins with query:', query);
-      const response = await fetch(`/api/coins/search?q=${encodeURIComponent(query)}&limit=20`);
+      // Sanitize query before sending
+      const sanitizedQuery = sanitizeSearchQuery(query);
+      console.log('CoinSelector - fetching coins with query:', sanitizedQuery);
+      const response = await fetch(`/api/coins/search?q=${encodeURIComponent(sanitizedQuery)}&limit=20`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -53,7 +56,9 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
   }, [isOpen, searchQuery]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+    // Sanitize search input
+    const sanitized = sanitizeSearchQuery(e.target.value);
+    setSearchQuery(sanitized);
   };
 
   const handleCoinSelect = (coinId: string) => {
@@ -118,13 +123,13 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
         <div className="flex items-center min-w-0 flex-1">
           {selectedCoinData && (
             <img
-              src={selectedCoinData.image}
-              alt={selectedCoinData.name}
+              src={sanitizeUrl(selectedCoinData.image)}
+              alt={escapeHtml(selectedCoinData.name)}
               className="w-5 h-5 sm:w-6 sm:h-6 mr-2 rounded-full flex-shrink-0"
             />
           )}
           <span className="truncate text-sm sm:text-base">
-            {selectedCoinData?.name || 'Select a coin'}
+            {selectedCoinData ? escapeHtml(selectedCoinData.name) : 'Select a coin'}
           </span>
         </div>
         <ChevronDown className={`h-4 w-4 ml-2 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -177,13 +182,13 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                     className="w-full flex items-center p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[56px] touch-manipulation active:scale-[0.98] select-none"
                   >
                     <img
-                      src={coin.image}
-                      alt={coin.name}
+                      src={sanitizeUrl(coin.image)}
+                      alt={escapeHtml(coin.name)}
                       className="w-8 h-8 sm:w-8 sm:h-8 mr-3 rounded-full flex-shrink-0"
                     />
                     <div className="flex-1 text-left min-w-0">
-                      <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{coin.name}</p>
-                      <p className="text-xs sm:text-sm text-gray-500 uppercase">{coin.symbol}</p>
+                      <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{escapeHtml(coin.name)}</p>
+                      <p className="text-xs sm:text-sm text-gray-500 uppercase">{escapeHtml(coin.symbol)}</p>
                     </div>
                     {coin.market_cap_rank && (
                       <span className="text-xs text-gray-400 flex-shrink-0 ml-2">

@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchCoins, fetchTopCoins } from '@/lib/api';
+import { sanitizeSearchQuery, sanitizeNumber } from '@/lib/utils/sanitize';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get('q');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    
+    // Sanitize search query
+    const query = sanitizeSearchQuery(searchParams.get('q'));
+    
+    // Sanitize limit parameter
+    const limit = sanitizeNumber(searchParams.get('limit') || '10', {
+      min: 1,
+      max: 100,
+      integer: true,
+      allowNegative: false,
+    }) || 10;
 
     console.log('Search API - query:', query, 'limit:', limit);
 

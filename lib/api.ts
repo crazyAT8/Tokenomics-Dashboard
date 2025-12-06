@@ -13,6 +13,7 @@ import {
   validateExchangeRateApiResponse,
   ValidationError,
 } from './validation/validators';
+import { sanitizeCoinId, sanitizeCurrency, sanitizeSearchQuery } from './utils/sanitize';
 
 const COINGECKO_API_URL = process.env.COINGECKO_API_URL || 'https://api.coingecko.com/api/v3';
 const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY;
@@ -38,9 +39,17 @@ api.interceptors.response.use(
 
 export const fetchCoinData = async (coinId: string, currency: string = 'usd'): Promise<CoinData> => {
   try {
+    // Sanitize inputs
+    const sanitizedCoinId = sanitizeCoinId(coinId);
+    const sanitizedCurrency = sanitizeCurrency(currency);
+    
+    if (!sanitizedCoinId) {
+      throw new Error('Invalid coin ID');
+    }
+    
     return await retry(async () => {
       // First fetch the coin data
-      const coinResponse = await api.get(`/coins/${coinId}`, {
+      const coinResponse = await api.get(`/coins/${sanitizedCoinId}`, {
         params: {
           localization: false,
           tickers: false,
@@ -57,8 +66,8 @@ export const fetchCoinData = async (coinId: string, currency: string = 'usd'): P
       // Then fetch market data with the specified currency
       const marketResponse = await api.get('/coins/markets', {
         params: {
-          vs_currency: currency,
-          ids: coinId,
+          vs_currency: sanitizedCurrency,
+          ids: sanitizedCoinId,
           order: 'market_cap_desc',
           per_page: 1,
           page: 1,
@@ -117,13 +126,13 @@ export const fetchCoinData = async (coinId: string, currency: string = 'usd'): P
           symbol: coinData.symbol,
           name: coinData.name,
           image: typeof image === 'string' ? image : '',
-          current_price: marketDataFromCoin?.current_price?.[currency] ?? 0,
-          market_cap: marketDataFromCoin?.market_cap?.[currency] ?? 0,
+          current_price: marketDataFromCoin?.current_price?.[sanitizedCurrency] ?? 0,
+          market_cap: marketDataFromCoin?.market_cap?.[sanitizedCurrency] ?? 0,
           market_cap_rank: marketDataFromCoin?.market_cap_rank ?? 0,
-          fully_diluted_valuation: marketDataFromCoin?.fully_diluted_valuation?.[currency] ?? null,
-          total_volume: marketDataFromCoin?.total_volume?.[currency] ?? 0,
-          high_24h: marketDataFromCoin?.high_24h?.[currency] ?? null,
-          low_24h: marketDataFromCoin?.low_24h?.[currency] ?? null,
+          fully_diluted_valuation: marketDataFromCoin?.fully_diluted_valuation?.[sanitizedCurrency] ?? null,
+          total_volume: marketDataFromCoin?.total_volume?.[sanitizedCurrency] ?? 0,
+          high_24h: marketDataFromCoin?.high_24h?.[sanitizedCurrency] ?? null,
+          low_24h: marketDataFromCoin?.low_24h?.[sanitizedCurrency] ?? null,
           price_change_24h: marketDataFromCoin?.price_change_24h ?? null,
           price_change_percentage_24h: marketDataFromCoin?.price_change_percentage_24h ?? null,
           market_cap_change_24h: marketDataFromCoin?.market_cap_change_24h ?? null,
@@ -131,12 +140,12 @@ export const fetchCoinData = async (coinId: string, currency: string = 'usd'): P
           circulating_supply: marketDataFromCoin?.circulating_supply ?? null,
           total_supply: marketDataFromCoin?.total_supply ?? null,
           max_supply: marketDataFromCoin?.max_supply ?? null,
-          ath: marketDataFromCoin?.ath?.[currency] ?? null,
-          ath_change_percentage: marketDataFromCoin?.ath_change_percentage?.[currency] ?? null,
-          ath_date: marketDataFromCoin?.ath_date?.[currency] ?? '',
-          atl: marketDataFromCoin?.atl?.[currency] ?? null,
-          atl_change_percentage: marketDataFromCoin?.atl_change_percentage?.[currency] ?? null,
-          atl_date: marketDataFromCoin?.atl_date?.[currency] ?? '',
+          ath: marketDataFromCoin?.ath?.[sanitizedCurrency] ?? null,
+          ath_change_percentage: marketDataFromCoin?.ath_change_percentage?.[sanitizedCurrency] ?? null,
+          ath_date: marketDataFromCoin?.ath_date?.[sanitizedCurrency] ?? '',
+          atl: marketDataFromCoin?.atl?.[sanitizedCurrency] ?? null,
+          atl_change_percentage: marketDataFromCoin?.atl_change_percentage?.[sanitizedCurrency] ?? null,
+          atl_date: marketDataFromCoin?.atl_date?.[sanitizedCurrency] ?? '',
           last_updated: marketDataFromCoin?.last_updated ?? new Date().toISOString(),
         };
       }
@@ -180,8 +189,16 @@ export const fetchPriceHistory = async (
   } = {}
 ): Promise<PriceHistory[]> => {
   try {
+    // Sanitize inputs
+    const sanitizedCoinId = sanitizeCoinId(coinId);
+    const sanitizedCurrency = sanitizeCurrency(options.currency);
+    
+    if (!sanitizedCoinId) {
+      throw new Error('Invalid coin ID');
+    }
+    
     return await retry(async () => {
-      const { days = 7, from, to, currency = 'usd' } = options;
+      const { days = 7, from, to } = options;
       
       // Calculate days if we have custom date range
       let calculatedDays = days;
@@ -193,12 +210,12 @@ export const fetchPriceHistory = async (
       // CoinGecko API limits: max 365 days for free tier, can use 'max' for all available data
       // For custom ranges, we'll use the calculated days
       const params: any = {
-        vs_currency: currency,
+        vs_currency: sanitizedCurrency,
         days: calculatedDays > 365 ? 365 : calculatedDays, // Cap at 365 days
         interval: calculatedDays <= 1 ? 'hourly' : 'daily',
       };
 
-      const response = await api.get(`/coins/${coinId}/market_chart`, {
+      const response = await api.get(`/coins/${sanitizedCoinId}/market_chart`, {
         params,
       });
       
@@ -331,10 +348,17 @@ export const fetchTopCoins = async (limit: number = 10): Promise<CoinData[]> => 
 
 export const searchCoins = async (query: string): Promise<CoinData[]> => {
   try {
+    // Sanitize search query
+    const sanitizedQuery = sanitizeSearchQuery(query);
+    
+    if (!sanitizedQuery) {
+      return [];
+    }
+    
     return await retry(async () => {
       const response = await api.get('/search', {
         params: {
-          query,
+          query: sanitizedQuery,
         },
       });
       
@@ -404,10 +428,13 @@ export const searchCoins = async (query: string): Promise<CoinData[]> => {
 
 export const fetchExchangeRates = async (baseCurrency: string = 'usd'): Promise<ExchangeRates> => {
   try {
+    // Sanitize base currency
+    const sanitizedBaseCurrency = sanitizeCurrency(baseCurrency);
+    
     return await retry(async () => {
       // Use exchangerate-api.com free tier (no API key required)
       // Convert currency code to uppercase for the API
-      const base = baseCurrency.toUpperCase();
+      const base = sanitizedBaseCurrency.toUpperCase();
       const response = await axios.get(`https://api.exchangerate-api.com/v4/latest/${base}`, {
         timeout: 5000,
       });
@@ -417,7 +444,7 @@ export const fetchExchangeRates = async (baseCurrency: string = 'usd'): Promise<
       
       // Transform to our ExchangeRates format
       const exchangeRates: ExchangeRates = {
-        base: base.toLowerCase(),
+        base: sanitizedBaseCurrency,
         rates: validatedResponse.rates,
         timestamp: validatedResponse.timestamp ?? Date.now(),
       };
