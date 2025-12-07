@@ -44,9 +44,20 @@ export interface PriceHistory {
   price: number;
 }
 
+export interface OHLCData {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+export type ChartType = 'line' | 'candlestick';
+
 export interface MarketData {
   coin: CoinData;
   priceHistory: PriceHistory[];
+  ohlcData?: OHLCData[];
   tokenomics: TokenomicsData;
 }
 

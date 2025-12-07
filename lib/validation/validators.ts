@@ -2,15 +2,17 @@ import { z } from 'zod';
 import { 
   CoinDataSchema, 
   PriceHistoryArraySchema, 
+  OHLCDataArraySchema,
   ExchangeRatesSchema, 
   MarketDataSchema,
   CoinGeckoCoinResponseSchema,
   CoinGeckoMarketResponseSchema,
   CoinGeckoMarketChartResponseSchema,
+  CoinGeckoOHLCResponseSchema,
   CoinGeckoSearchResponseSchema,
   ExchangeRateApiResponseSchema,
 } from './schemas';
-import { CoinData, PriceHistory, ExchangeRates, MarketData } from '../types';
+import { CoinData, PriceHistory, OHLCData, ExchangeRates, MarketData } from '../types';
 import {
   applyCoinDataFallbacks,
   applyTokenomicsDataFallbacks,
@@ -118,6 +120,46 @@ export function validatePriceHistory(data: unknown): PriceHistory[] {
 }
 
 /**
+ * Validates OHLCData array with fallback values for missing fields
+ */
+export function validateOHLCData(data: unknown): OHLCData[] {
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  
+  // Apply fallbacks to each OHLC entry
+  const dataWithFallbacks = data.map((item) => {
+    const normalized = typeof item === 'object' && item !== null ? item as Partial<OHLCData> : {};
+    // Ensure high >= low, high >= open, high >= close, low <= open, low <= close
+    if (normalized.high !== undefined && normalized.low !== undefined) {
+      normalized.high = Math.max(normalized.high, normalized.low || 0);
+      normalized.low = Math.min(normalized.low, normalized.high || 0);
+    }
+    if (normalized.high !== undefined && normalized.open !== undefined) {
+      normalized.high = Math.max(normalized.high, normalized.open || 0);
+    }
+    if (normalized.high !== undefined && normalized.close !== undefined) {
+      normalized.high = Math.max(normalized.high, normalized.close || 0);
+    }
+    if (normalized.low !== undefined && normalized.open !== undefined) {
+      normalized.low = Math.min(normalized.low, normalized.open || 0);
+    }
+    if (normalized.low !== undefined && normalized.close !== undefined) {
+      normalized.low = Math.min(normalized.low, normalized.close || 0);
+    }
+    return {
+      timestamp: normalized.timestamp ?? Date.now(),
+      open: normalized.open ?? 0,
+      high: normalized.high ?? Math.max(normalized.open ?? 0, normalized.close ?? 0),
+      low: normalized.low ?? Math.min(normalized.open ?? 0, normalized.close ?? 0),
+      close: normalized.close ?? 0,
+    };
+  });
+  
+  return validate(OHLCDataArraySchema, dataWithFallbacks, 'Invalid OHLC data structure');
+}
+
+/**
  * Validates ExchangeRates with fallback values for missing fields
  */
 export function validateExchangeRates(data: unknown): ExchangeRates {
@@ -160,6 +202,13 @@ export function validateCoinGeckoMarketResponse(data: unknown) {
  */
 export function validateCoinGeckoMarketChartResponse(data: unknown) {
   return validate(CoinGeckoMarketChartResponseSchema, data, 'Invalid CoinGecko market chart API response');
+}
+
+/**
+ * Validates CoinGecko OHLC API response
+ */
+export function validateCoinGeckoOHLCResponse(data: unknown) {
+  return validate(CoinGeckoOHLCResponseSchema, data, 'Invalid CoinGecko OHLC API response');
 }
 
 /**

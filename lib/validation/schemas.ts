@@ -58,6 +58,23 @@ export const PriceHistorySchema = z.object({
 // PriceHistory array schema
 export const PriceHistoryArraySchema = z.array(PriceHistorySchema).min(0);
 
+// OHLCData validation schema
+export const OHLCDataSchema = z.object({
+  timestamp: z.number().int().nonnegative().default(() => Date.now()),
+  open: z.number().finite().nonnegative().default(0),
+  high: z.number().finite().nonnegative().default(0),
+  low: z.number().finite().nonnegative().default(0),
+  close: z.number().finite().nonnegative().default(0),
+});
+
+// OHLCData array schema
+export const OHLCDataArraySchema = z.array(OHLCDataSchema).min(0);
+
+// CoinGecko OHLC response schema (array of [timestamp, open, high, low, close])
+export const CoinGeckoOHLCResponseSchema = z.array(
+  z.tuple([z.number(), z.number(), z.number(), z.number(), z.number()])
+);
+
 // TokenomicsData validation schema with fallback defaults
 export const TokenomicsDataSchema = z.object({
   circulating_supply: z.number().finite().nonnegative().nullable(),
@@ -76,6 +93,7 @@ export const TokenomicsDataSchema = z.object({
 export const MarketDataSchema = z.object({
   coin: CoinDataSchema,
   priceHistory: PriceHistoryArraySchema,
+  ohlcData: OHLCDataArraySchema.optional(),
   tokenomics: TokenomicsDataSchema,
 });
 

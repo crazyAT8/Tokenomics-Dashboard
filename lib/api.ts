@@ -1,14 +1,16 @@
 import axios, { AxiosError } from 'axios';
-import { CoinData, PriceHistory, ExchangeRates } from './types';
+import { CoinData, PriceHistory, OHLCData, ExchangeRates } from './types';
 import { retry } from './utils/retry';
 import { parseError, getUserFriendlyErrorMessage } from './utils/errorHandler';
 import {
   validateCoinData,
   validatePriceHistory,
+  validateOHLCData,
   validateExchangeRates,
   validateCoinGeckoCoinResponse,
   validateCoinGeckoMarketResponse,
   validateCoinGeckoMarketChartResponse,
+  validateCoinGeckoOHLCResponse,
   validateCoinGeckoSearchResponse,
   validateExchangeRateApiResponse,
   ValidationError,
@@ -247,6 +249,86 @@ export const fetchPriceHistory = async (
     });
   } catch (error: any) {
     console.error('Error fetching price history:', error);
+    
+    // Handle validation errors
+    if (error instanceof ValidationError) {
+      const validationError = new Error(`Data validation failed: ${error.message}`);
+      (validationError as any).parsedError = {
+        message: error.message,
+        statusCode: 500,
+        retryable: false,
+        type: 'validation_error',
+      };
+      throw validationError;
+    }
+    
+    const parsedError = error.parsedError || parseError(error);
+    const message = getUserFriendlyErrorMessage(parsedError);
+    const enhancedError = new Error(message);
+    (enhancedError as any).parsedError = parsedError;
+    throw enhancedError;
+  }
+};
+
+export const fetchOHLC = async (
+  coinId: string,
+  options: {
+    days?: number;
+    currency?: string;
+  } = {}
+): Promise<OHLCData[]> => {
+  try {
+    // Sanitize inputs
+    const sanitizedCoinId = sanitizeCoinId(coinId);
+    const sanitizedCurrency = sanitizeCurrency(options.currency);
+    
+    if (!sanitizedCoinId) {
+      throw new Error('Invalid coin ID');
+    }
+    
+    return await retry(async () => {
+      const { days = 7 } = options;
+      
+      // CoinGecko OHLC endpoint supports: 1, 7, 14, 30, 90, 180, 365 days
+      // We'll use the closest supported value
+      const supportedDays = [1, 7, 14, 30, 90, 180, 365];
+      const selectedDays = supportedDays.reduce((prev, curr) => 
+        Math.abs(curr - days) < Math.abs(prev - days) ? curr : prev
+      );
+
+      const params: any = {
+        vs_currency: sanitizedCurrency,
+        days: selectedDays,
+      };
+
+      const response = await api.get(`/coins/${sanitizedCoinId}/ohlc`, {
+        params,
+      });
+      
+      // Validate raw API response
+      const validatedResponse = validateCoinGeckoOHLCResponse(response.data);
+      
+      // Transform OHLC data: [timestamp, open, high, low, close]
+      const ohlcData = validatedResponse
+        .filter(([timestamp, open, high, low, close]) => 
+          timestamp && open > 0 && high > 0 && low > 0 && close > 0
+        )
+        .map(([timestamp, open, high, low, close]) => ({
+          timestamp,
+          open,
+          high,
+          low,
+          close,
+        }));
+      
+      // Validate the final OHLC array
+      return validateOHLCData(ohlcData);
+    }, {
+      maxRetries: 3,
+      initialDelay: 1000,
+    });
+  } catch (error: any) {
+    console.error('Error fetching OHLC data:', error);
     
     // Handle validation errors
     if (error instanceof ValidationError) {

@@ -16,6 +16,7 @@ export const useCoinData = () => {
     retryCount,
     timeRange,
     currency,
+    chartType,
     setMarketData,
     setLoading,
     setError,
@@ -75,9 +76,10 @@ export const useCoinData = () => {
     try {
       console.log('Fetching data for coin:', selectedCoin, 'range:', currentKey);
       
-      // Build query parameters based on time range and currency
+      // Build query parameters based on time range, currency, and chart type
       const params = new URLSearchParams();
       params.append('currency', currency);
+      params.append('chartType', chartType);
       if (timeRange.type === 'custom' && timeRange.from && timeRange.to) {
         params.append('from', timeRange.from.toISOString());
         params.append('to', timeRange.to.toISOString());
@@ -120,6 +122,7 @@ export const useCoinData = () => {
   }, [
     selectedCoin, 
     currentTimeRangeKey,
+    chartType,
     networkStatus.isOnline,
     setMarketData, 
     setLoading, 

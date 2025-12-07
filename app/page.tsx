@@ -12,6 +12,8 @@ import { TimeRangeSelector } from '@/components/dashboard/TimeRangeSelector';
 import { CurrencySelector } from '@/components/dashboard/CurrencySelector';
 import { CurrencyRates } from '@/components/dashboard/CurrencyRates';
 import { PriceChart } from '@/components/charts/PriceChart';
+import { CandlestickChart } from '@/components/charts/CandlestickChart';
+import { ChartTypeSelector } from '@/components/dashboard/ChartTypeSelector';
 import { TokenomicsOverview } from '@/components/dashboard/TokenomicsOverview';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Favorites } from '@/components/dashboard/Favorites';
@@ -43,6 +45,8 @@ export default function Dashboard() {
     setTimeRange,
     currency,
     setCurrency,
+    chartType,
+    setChartType,
   } = useDashboardStore();
   const { marketData, isLoading, error, errorDetails: hookErrorDetails, retryCount: hookRetryCount, refreshData } = useCoinData();
   const networkStatusHook = useNetworkStatus();
@@ -275,17 +279,27 @@ export default function Dashboard() {
               <div className="lg:col-span-2 order-1 min-w-0">
                 <Card className="overflow-hidden">
                   <CardHeader className="p-3 sm:p-4 md:p-5 lg:p-6">
-                    <CardTitle className="flex items-center text-sm sm:text-base md:text-lg">
-                      <img
-                        src={sanitizeUrl(marketData.coin.image)}
-                        alt={escapeHtml(marketData.coin.name)}
-                        className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mr-2 sm:mr-3 rounded-full flex-shrink-0"
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <CardTitle className="flex items-center text-sm sm:text-base md:text-lg">
+                        <img
+                          src={sanitizeUrl(marketData.coin.image)}
+                          alt={escapeHtml(marketData.coin.name)}
+                          className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mr-2 sm:mr-3 rounded-full flex-shrink-0"
+                        />
+                        <span className="truncate">{escapeHtml(marketData.coin.name)} Price Chart</span>
+                      </CardTitle>
+                      <ChartTypeSelector
+                        chartType={chartType}
+                        onChartTypeChange={setChartType}
                       />
-                      <span className="truncate">{escapeHtml(marketData.coin.name)} Price Chart</span>
-                    </CardTitle>
+                    </div>
                   </CardHeader>
                   <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6 min-w-0">
-                    <PriceChart data={marketData.priceHistory} currency={currency} />
+                    {chartType === 'candlestick' && marketData.ohlcData && marketData.ohlcData.length > 0 ? (
+                      <CandlestickChart data={marketData.ohlcData} currency={currency} />
+                    ) : (
+                      <PriceChart data={marketData.priceHistory} currency={currency} />
+                    )}
                   </CardContent>
                 </Card>
               </div>

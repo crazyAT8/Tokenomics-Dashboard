@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchCoinData, fetchPriceHistory } from '@/lib/api';
+import { fetchCoinData, fetchPriceHistory, fetchOHLC } from '@/lib/api';
 import { validateMarketData } from '@/lib/validation/validators';
 import { sanitizeCoinId, sanitizeCurrency, sanitizeNumber, sanitizeDate } from '@/lib/utils/sanitize';
 
@@ -23,11 +23,18 @@ export async function GET(
     // Sanitize currency parameter
     const currency = sanitizeCurrency(searchParams.get('currency'));
     
+    // Check for chart type (optional)
+    const chartType = searchParams.get('chartType') === 'candlestick' ? 'candlestick' : 'line';
+    
     // Check for custom date range
     const fromParam = searchParams.get('from');
     const toParam = searchParams.get('to');
     
     let priceHistoryOptions: { days?: number; from?: Date; to?: Date; currency?: string } = {
+      currency,
+    };
+    
+    let ohlcOptions: { days?: number; currency?: string } = {
       currency,
     };
     
@@ -45,6 +52,9 @@ export async function GET(
       
       priceHistoryOptions.from = from;
       priceHistoryOptions.to = to;
+      // Calculate days for OHLC (CoinGecko OHLC doesn't support custom date ranges)
+      const daysDiff = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+      ohlcOptions.days = Math.min(365, Math.max(1, daysDiff));
     } else {
       // Sanitize days parameter
       const days = sanitizeNumber(searchParams.get('days') || '7', {
@@ -62,16 +72,20 @@ export async function GET(
       }
       
       priceHistoryOptions.days = days;
+      ohlcOptions.days = days;
     }
 
-    const [coinData, priceHistory] = await Promise.all([
+    // Fetch data based on chart type
+    const [coinData, priceHistory, ohlcData] = await Promise.all([
       fetchCoinData(coinId, currency),
       fetchPriceHistory(coinId, priceHistoryOptions),
+      chartType === 'candlestick' ? fetchOHLC(coinId, ohlcOptions) : Promise.resolve(undefined),
     ]);
 
     const marketData = {
       coin: coinData,
       priceHistory,
+      ohlcData,
       tokenomics: {
         circulating_supply: coinData.circulating_supply,
         total_supply: coinData.total_supply,

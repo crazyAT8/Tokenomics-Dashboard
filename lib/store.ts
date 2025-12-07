@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DashboardState, MarketData } from './types';
+import { DashboardState, MarketData, ChartType } from './types';
 import { ApiError } from './utils/errorHandler';
 import { TimeRange } from '@/components/dashboard/TimeRangeSelector';
 
@@ -15,6 +15,7 @@ interface ExtendedDashboardState extends DashboardState {
   retryCount: number;
   timeRange: TimeRange;
   currency: Currency;
+  chartType: ChartType;
 }
 
 interface DashboardStore extends ExtendedDashboardState {
@@ -29,6 +30,7 @@ interface DashboardStore extends ExtendedDashboardState {
   resetRetryCount: () => void;
   setTimeRange: (range: TimeRange) => void;
   setCurrency: (currency: Currency) => void;
+  setChartType: (chartType: ChartType) => void;
 }
 
 export const useDashboardStore = create<DashboardStore>()(
@@ -47,6 +49,7 @@ export const useDashboardStore = create<DashboardStore>()(
       retryCount: 0,
       timeRange: { type: '7d', days: 7 },
       currency: 'usd',
+      chartType: 'line',
 
       setSelectedCoin: (coin) => set({ selectedCoin: coin }),
       setMarketData: (data) => set({ marketData: data, error: null, errorDetails: null, retryCount: 0 }),
@@ -60,6 +63,7 @@ export const useDashboardStore = create<DashboardStore>()(
       resetRetryCount: () => set({ retryCount: 0 }),
       setTimeRange: (range) => set({ timeRange: range }),
       setCurrency: (currency) => set({ currency }),
+      setChartType: (chartType) => set({ chartType }),
     }),
     {
       name: 'dashboard-storage',
@@ -67,6 +71,7 @@ export const useDashboardStore = create<DashboardStore>()(
         currency: state.currency,
         selectedCoin: state.selectedCoin,
         timeRange: state.timeRange,
+        chartType: state.chartType,
       }),
     }
   )
