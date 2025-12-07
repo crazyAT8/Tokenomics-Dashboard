@@ -163,8 +163,8 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Favorites */}
-        <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
+        {/* Favorites - Quick Access Watchlist */}
+        <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8 sticky top-4 z-30">
           <Favorites
             selectedCoin={selectedCoin}
             onCoinSelect={setSelectedCoin}
