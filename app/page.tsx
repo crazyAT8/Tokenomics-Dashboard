@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDashboardStore } from '@/lib/store';
 import { useCoinData } from '@/hooks/useCoinData';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
@@ -15,6 +15,8 @@ import { PriceChart } from '@/components/charts/PriceChart';
 import { TokenomicsOverview } from '@/components/dashboard/TokenomicsOverview';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Favorites } from '@/components/dashboard/Favorites';
+import { PortfolioOverview } from '@/components/dashboard/PortfolioOverview';
+import { CoinData } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { NetworkStatus } from '@/components/ui/NetworkStatus';
 import { 
@@ -45,7 +47,9 @@ export default function Dashboard() {
   const { marketData, isLoading, error, errorDetails: hookErrorDetails, retryCount: hookRetryCount, refreshData } = useCoinData();
   const networkStatusHook = useNetworkStatus();
   const { exchangeRates, isLoading: ratesLoading, refreshRates } = useExchangeRates(currency);
-  const { toggleFavorite, isFavorite } = useFavorites();
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+  const [favoriteCoins, setFavoriteCoins] = useState<CoinData[]>([]);
+  const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
 
   // Sync network status from hook to store
   useEffect(() => {
@@ -58,6 +62,65 @@ export default function Dashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networkStatusHook.isOnline, networkStatusHook.wasOffline]);
+
+  // Fetch favorite coins data for portfolio overview
+  useEffect(() => {
+    const fetchFavoriteCoins = async () => {
+      if (favorites.length === 0) {
+        setFavoriteCoins([]);
+        return;
+      }
+
+      setIsLoadingFavorites(true);
+      try {
+        const favoriteIds = favorites.map(fav => fav.id).join(',');
+        const response = await fetch(`/api/coins/search?ids=${encodeURIComponent(favoriteIds)}&limit=${favorites.length}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch favorite coins: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        // Sort favorites to maintain the order they were added
+        const sortedFavorites = favorites
+          .map(fav => data.find((coin: CoinData) => coin.id === fav.id))
+          .filter((coin): coin is CoinData => coin !== undefined);
+        
+        setFavoriteCoins(sortedFavorites);
+      } catch (error) {
+        console.error('Error fetching favorite coins for portfolio:', error);
+        setFavoriteCoins([]);
+      } finally {
+        setIsLoadingFavorites(false);
+      }
+    };
+
+    fetchFavoriteCoins();
+  }, [favorites]);
+
+  // Auto-refresh favorite coins data periodically (every 30 seconds)
+  useEffect(() => {
+    if (favorites.length === 0) return;
+    
+    const interval = setInterval(async () => {
+      try {
+        const favoriteIds = favorites.map(fav => fav.id).join(',');
+        const response = await fetch(`/api/coins/search?ids=${encodeURIComponent(favoriteIds)}&limit=${favorites.length}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          const sortedFavorites = favorites
+            .map(fav => data.find((coin: CoinData) => coin.id === fav.id))
+            .filter((coin): coin is CoinData => coin !== undefined);
+          setFavoriteCoins(sortedFavorites);
+        }
+      } catch (error) {
+        console.error('Error refreshing favorite coins:', error);
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [favorites]);
 
   const displayErrorDetails = errorDetails || hookErrorDetails;
   const displayRetryCount = retryCount || hookRetryCount;
@@ -170,6 +233,13 @@ export default function Dashboard() {
             onCoinSelect={setSelectedCoin}
           />
         </div>
+
+        {/* Portfolio Overview */}
+        {favoriteCoins.length > 0 && (
+          <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
+            <PortfolioOverview coins={favoriteCoins} currency={currency} />
+          </div>
+        )}
 
         {/* Currency Exchange Rates */}
         <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
