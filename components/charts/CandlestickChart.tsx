@@ -13,20 +13,24 @@ import {
   ReferenceLine,
   Cell,
 } from 'recharts';
-import { OHLCData } from '@/lib/types';
+import { OHLCData, TechnicalAnalysisSettings } from '@/lib/types';
 import { Currency } from '@/lib/store';
 import { formatCurrencyFull, CURRENCY_INFO } from '@/lib/utils/currency';
+import { calculateAllIndicatorsOHLC } from '@/lib/utils/technicalAnalysis';
+import { Area } from 'recharts';
 
 interface CandlestickChartProps {
   data: OHLCData[];
   height?: number;
   currency?: Currency;
+  technicalAnalysis?: TechnicalAnalysisSettings;
 }
 
 export const CandlestickChart: React.FC<CandlestickChartProps> = ({ 
   data, 
   height, 
-  currency = 'usd' 
+  currency = 'usd',
+  technicalAnalysis
 }) => {
   const [chartHeight, setChartHeight] = useState(height || 300);
   const [isMobile, setIsMobile] = useState(false);
@@ -60,11 +64,19 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     return () => window.removeEventListener('resize', updateDimensions);
   }, [height]);
 
-  // Transform data for Recharts with volume indicators
+  // Calculate technical indicators
+  const indicators = useMemo(() => {
+    if (!technicalAnalysis || data.length === 0) {
+      return null;
+    }
+    return calculateAllIndicatorsOHLC(data);
+  }, [data, technicalAnalysis]);
+
+  // Transform data for Recharts with volume indicators and technical analysis
   const chartData = useMemo(() => {
     return data.map((item, index) => {
       const isPositive = item.close >= item.open;
-      return {
+      const baseData = {
         timestamp: item.timestamp,
         open: item.open,
         high: item.high,
@@ -72,11 +84,28 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
         close: item.close,
         isPositive,
         volume: item.volume || 0,
-        // For visualization - use close as main value
         value: item.close,
       };
+
+      if (!indicators) return baseData;
+
+      return {
+        ...baseData,
+        sma20: indicators.sma20[index],
+        sma50: indicators.sma50[index],
+        sma200: indicators.sma200[index],
+        ema20: indicators.ema20[index],
+        ema50: indicators.ema50[index],
+        rsi: indicators.rsi[index]?.rsi,
+        macd: indicators.macd[index]?.macd,
+        macdSignal: indicators.macd[index]?.signal,
+        macdHistogram: indicators.macd[index]?.histogram,
+        bbUpper: indicators.bollinger[index]?.upper,
+        bbMiddle: indicators.bollinger[index]?.middle,
+        bbLower: indicators.bollinger[index]?.lower,
+      };
     });
-  }, [data]);
+  }, [data, indicators]);
 
   // Calculate volume moving average (20-period)
   const volumeWithMA = useMemo(() => {
@@ -91,6 +120,23 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       return { ...item, volumeMA: sum / period };
     });
   }, [chartData]);
+
+  // Calculate domain with technical indicators
+  const priceDomain = useMemo(() => {
+    const allValues = data.flatMap(d => [d.high, d.low]);
+    
+    if (indicators && technicalAnalysis?.showBollingerBands) {
+      const bbValues = indicators.bollinger
+        .flatMap(b => [b.upper, b.lower])
+        .filter(v => !isNaN(v));
+      allValues.push(...bbValues);
+    }
+    
+    const minValue = Math.min(...allValues);
+    const maxValue = Math.max(...allValues);
+    const padding = (maxValue - minValue) * 0.1;
+    return [minValue - padding, maxValue + padding];
+  }, [data, indicators, technicalAnalysis]);
 
   // Calculate volume statistics for scaling
   const volumeStats = useMemo(() => {
@@ -147,8 +193,10 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       const data = payload[0].payload;
       const isPositive = data.close >= data.open;
       const hasVolume = data.volume !== undefined && data.volume > 0;
+      const hasIndicators = technicalAnalysis && indicators;
+      
       return (
-        <div className="bg-white p-2 sm:p-3 border border-gray-200 rounded-lg shadow-lg">
+        <div className="bg-white p-2 sm:p-3 border border-gray-200 rounded-lg shadow-lg max-w-xs">
           <p className="text-xs sm:text-sm text-gray-500 mb-1">
             {new Date(data.timestamp).toLocaleString()}
           </p>
@@ -191,6 +239,80 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
                 )}
               </>
             )}
+            {hasIndicators && (
+              <div className="pt-1 border-t border-gray-200 space-y-1">
+                {technicalAnalysis.showSMA20 && !isNaN(data.sma20) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">SMA 20:</span>
+                    <span className="text-xs sm:text-sm font-medium text-blue-600">{formatCurrencyFull(data.sma20, currency)}</span>
+                  </div>
+                )}
+                {technicalAnalysis.showSMA50 && !isNaN(data.sma50) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">SMA 50:</span>
+                    <span className="text-xs sm:text-sm font-medium text-purple-600">{formatCurrencyFull(data.sma50, currency)}</span>
+                  </div>
+                )}
+                {technicalAnalysis.showSMA200 && !isNaN(data.sma200) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">SMA 200:</span>
+                    <span className="text-xs sm:text-sm font-medium text-indigo-600">{formatCurrencyFull(data.sma200, currency)}</span>
+                  </div>
+                )}
+                {technicalAnalysis.showEMA20 && !isNaN(data.ema20) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">EMA 20:</span>
+                    <span className="text-xs sm:text-sm font-medium text-cyan-600">{formatCurrencyFull(data.ema20, currency)}</span>
+                  </div>
+                )}
+                {technicalAnalysis.showEMA50 && !isNaN(data.ema50) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">EMA 50:</span>
+                    <span className="text-xs sm:text-sm font-medium text-teal-600">{formatCurrencyFull(data.ema50, currency)}</span>
+                  </div>
+                )}
+                {technicalAnalysis.showBollingerBands && !isNaN(data.bbUpper) && (
+                  <>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-xs sm:text-sm text-gray-600">BB Upper:</span>
+                      <span className="text-xs sm:text-sm font-medium text-orange-600">{formatCurrencyFull(data.bbUpper, currency)}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-xs sm:text-sm text-gray-600">BB Middle:</span>
+                      <span className="text-xs sm:text-sm font-medium text-orange-500">{formatCurrencyFull(data.bbMiddle, currency)}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-xs sm:text-sm text-gray-600">BB Lower:</span>
+                      <span className="text-xs sm:text-sm font-medium text-orange-600">{formatCurrencyFull(data.bbLower, currency)}</span>
+                    </div>
+                  </>
+                )}
+                {technicalAnalysis.showRSI && !isNaN(data.rsi) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">RSI:</span>
+                    <span className={`text-xs sm:text-sm font-medium ${
+                      data.rsi > 70 ? 'text-red-600' : data.rsi < 30 ? 'text-green-600' : 'text-pink-600'
+                    }`}>
+                      {data.rsi.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {technicalAnalysis.showMACD && !isNaN(data.macd) && (
+                  <>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-xs sm:text-sm text-gray-600">MACD:</span>
+                      <span className="text-xs sm:text-sm font-medium text-green-600">{data.macd.toFixed(4)}</span>
+                    </div>
+                    {!isNaN(data.macdSignal) && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-xs sm:text-sm text-gray-600">Signal:</span>
+                        <span className="text-xs sm:text-sm font-medium text-green-500">{data.macdSignal.toFixed(4)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       );
@@ -206,11 +328,6 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     ? { top: 10, right: 20, left: 20, bottom: 70 }
     : { top: 10, right: 30, left: 30, bottom: 60 };
 
-  // Calculate min and max for domain
-  const allValues = useMemo(() => data.flatMap(d => [d.high, d.low]), [data]);
-  const minValue = Math.min(...allValues);
-  const maxValue = Math.max(...allValues);
-  const padding = (maxValue - minValue) * 0.1;
 
   // Render candlesticks as custom SVG overlay
   const renderCandlesticks = () => {
@@ -257,7 +374,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             fontSize={isSmallMobile ? 9 : isMobile ? 10 : 12}
             width={isSmallMobile ? 45 : isMobile ? 60 : 80}
             tick={{ fill: '#666' }}
-            domain={[minValue - padding, maxValue + padding]}
+            domain={priceDomain}
             orientation="left"
           />
           <YAxis
@@ -306,6 +423,128 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             dot={false}
             activeDot={{ r: 5 }}
           />
+          {/* Technical Indicators */}
+          {technicalAnalysis?.showSMA20 && (
+            <Line
+              yAxisId="price"
+              type="monotone"
+              dataKey="sma20"
+              stroke="#2563eb"
+              strokeWidth={1.5}
+              dot={false}
+              strokeDasharray="3 3"
+              opacity={0.8}
+            />
+          )}
+          {technicalAnalysis?.showSMA50 && (
+            <Line
+              yAxisId="price"
+              type="monotone"
+              dataKey="sma50"
+              stroke="#7c3aed"
+              strokeWidth={1.5}
+              dot={false}
+              strokeDasharray="3 3"
+              opacity={0.8}
+            />
+          )}
+          {technicalAnalysis?.showSMA200 && (
+            <Line
+              yAxisId="price"
+              type="monotone"
+              dataKey="sma200"
+              stroke="#4f46e5"
+              strokeWidth={1.5}
+              dot={false}
+              strokeDasharray="3 3"
+              opacity={0.8}
+            />
+          )}
+          {technicalAnalysis?.showEMA20 && (
+            <Line
+              yAxisId="price"
+              type="monotone"
+              dataKey="ema20"
+              stroke="#06b6d4"
+              strokeWidth={1.5}
+              dot={false}
+              opacity={0.8}
+            />
+          )}
+          {technicalAnalysis?.showEMA50 && (
+            <Line
+              yAxisId="price"
+              type="monotone"
+              dataKey="ema50"
+              stroke="#14b8a6"
+              strokeWidth={1.5}
+              dot={false}
+              opacity={0.8}
+            />
+          )}
+          {technicalAnalysis?.showBollingerBands && (
+            <>
+              <Area
+                yAxisId="price"
+                type="monotone"
+                dataKey="bbUpper"
+                stroke="none"
+                fill="#f97316"
+                fillOpacity={0.1}
+                connectNulls={false}
+              />
+              <Line
+                yAxisId="price"
+                type="monotone"
+                dataKey="bbUpper"
+                stroke="#f97316"
+                strokeWidth={1}
+                dot={false}
+                opacity={0.6}
+              />
+              <Line
+                yAxisId="price"
+                type="monotone"
+                dataKey="bbMiddle"
+                stroke="#fb923c"
+                strokeWidth={1}
+                dot={false}
+                strokeDasharray="2 2"
+                opacity={0.6}
+              />
+              <Line
+                yAxisId="price"
+                type="monotone"
+                dataKey="bbLower"
+                stroke="#f97316"
+                strokeWidth={1}
+                dot={false}
+                opacity={0.6}
+              />
+            </>
+          )}
+          {technicalAnalysis?.showSupportResistance && indicators && (
+            <>
+              <ReferenceLine
+                yAxisId="price"
+                y={indicators.supportResistance.support}
+                stroke="#eab308"
+                strokeWidth={1.5}
+                strokeDasharray="5 5"
+                opacity={0.7}
+                label={{ value: 'Support', position: 'right', fill: '#eab308', fontSize: 10 }}
+              />
+              <ReferenceLine
+                yAxisId="price"
+                y={indicators.supportResistance.resistance}
+                stroke="#eab308"
+                strokeWidth={1.5}
+                strokeDasharray="5 5"
+                opacity={0.7}
+                label={{ value: 'Resistance', position: 'right', fill: '#eab308', fontSize: 10 }}
+              />
+            </>
+          )}
           {/* Volume bars with color coding */}
           {volumeStats.max > 0 && (
             <>

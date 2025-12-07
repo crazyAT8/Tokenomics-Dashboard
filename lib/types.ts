@@ -55,6 +55,18 @@ export interface OHLCData {
 
 export type ChartType = 'line' | 'candlestick';
 
+export interface TechnicalAnalysisSettings {
+  showSMA20: boolean;
+  showSMA50: boolean;
+  showSMA200: boolean;
+  showEMA20: boolean;
+  showEMA50: boolean;
+  showRSI: boolean;
+  showMACD: boolean;
+  showBollingerBands: boolean;
+  showSupportResistance: boolean;
+}
+
 export interface MarketData {
   coin: CoinData;
   priceHistory: PriceHistory[];

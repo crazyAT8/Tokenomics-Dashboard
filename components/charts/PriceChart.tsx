@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -10,17 +10,25 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { PriceHistory } from '@/lib/types';
+import { PriceHistory, TechnicalAnalysisSettings } from '@/lib/types';
 import { Currency } from '@/lib/store';
 import { formatCurrency, formatCurrencyFull, CURRENCY_INFO } from '@/lib/utils/currency';
+import { calculateAllIndicators } from '@/lib/utils/technicalAnalysis';
+import { Area } from 'recharts';
 
 interface PriceChartProps {
   data: PriceHistory[];
   height?: number;
   currency?: Currency;
+  technicalAnalysis?: TechnicalAnalysisSettings;
 }
 
-export const PriceChart: React.FC<PriceChartProps> = ({ data, height, currency = 'usd' }) => {
+export const PriceChart: React.FC<PriceChartProps> = ({ 
+  data, 
+  height, 
+  currency = 'usd',
+  technicalAnalysis 
+}) => {
   const [chartHeight, setChartHeight] = useState(height || 300);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -53,6 +61,42 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height, currency =
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
   }, [height]);
+
+  // Calculate technical indicators
+  const indicators = useMemo(() => {
+    if (!technicalAnalysis || data.length === 0) {
+      return null;
+    }
+    return calculateAllIndicators(data);
+  }, [data, technicalAnalysis]);
+
+  // Transform data with technical indicators
+  const chartDataWithIndicators = useMemo(() => {
+    return data.map((item, index) => {
+      const baseData = {
+        timestamp: item.timestamp,
+        price: item.price,
+      };
+
+      if (!indicators) return baseData;
+
+      return {
+        ...baseData,
+        sma20: indicators.sma20[index],
+        sma50: indicators.sma50[index],
+        sma200: indicators.sma200[index],
+        ema20: indicators.ema20[index],
+        ema50: indicators.ema50[index],
+        rsi: indicators.rsi[index]?.rsi,
+        macd: indicators.macd[index]?.macd,
+        macdSignal: indicators.macd[index]?.signal,
+        macdHistogram: indicators.macd[index]?.histogram,
+        bbUpper: indicators.bollinger[index]?.upper,
+        bbMiddle: indicators.bollinger[index]?.middle,
+        bbLower: indicators.bollinger[index]?.lower,
+      };
+    });
+  }, [data, indicators]);
 
   const formatXAxis = (tickItem: number) => {
     const date = new Date(tickItem);
@@ -87,8 +131,100 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height, currency =
     return `${info.symbol}${value.toLocaleString()}`;
   };
 
-  const formatTooltip = (value: number, name: string) => {
-    return [formatCurrencyFull(value, currency), 'Price'];
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      const hasIndicators = technicalAnalysis && indicators;
+      
+      return (
+        <div className="bg-white p-2 sm:p-3 border border-gray-200 rounded-lg shadow-lg max-w-xs">
+          <p className="text-xs sm:text-sm text-gray-500 mb-1">
+            {new Date(data.timestamp).toLocaleString()}
+          </p>
+          <div className="space-y-1">
+            <div className="flex justify-between gap-4">
+              <span className="text-xs sm:text-sm text-gray-600">Price:</span>
+              <span className="text-xs sm:text-sm font-medium">{formatCurrencyFull(data.price, currency)}</span>
+            </div>
+            {hasIndicators && (
+              <div className="pt-1 border-t border-gray-200 space-y-1">
+                {technicalAnalysis.showSMA20 && !isNaN(data.sma20) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">SMA 20:</span>
+                    <span className="text-xs sm:text-sm font-medium text-blue-600">{formatCurrencyFull(data.sma20, currency)}</span>
+                  </div>
+                )}
+                {technicalAnalysis.showSMA50 && !isNaN(data.sma50) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">SMA 50:</span>
+                    <span className="text-xs sm:text-sm font-medium text-purple-600">{formatCurrencyFull(data.sma50, currency)}</span>
+                  </div>
+                )}
+                {technicalAnalysis.showSMA200 && !isNaN(data.sma200) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">SMA 200:</span>
+                    <span className="text-xs sm:text-sm font-medium text-indigo-600">{formatCurrencyFull(data.sma200, currency)}</span>
+                  </div>
+                )}
+                {technicalAnalysis.showEMA20 && !isNaN(data.ema20) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">EMA 20:</span>
+                    <span className="text-xs sm:text-sm font-medium text-cyan-600">{formatCurrencyFull(data.ema20, currency)}</span>
+                  </div>
+                )}
+                {technicalAnalysis.showEMA50 && !isNaN(data.ema50) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">EMA 50:</span>
+                    <span className="text-xs sm:text-sm font-medium text-teal-600">{formatCurrencyFull(data.ema50, currency)}</span>
+                  </div>
+                )}
+                {technicalAnalysis.showBollingerBands && !isNaN(data.bbUpper) && (
+                  <>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-xs sm:text-sm text-gray-600">BB Upper:</span>
+                      <span className="text-xs sm:text-sm font-medium text-orange-600">{formatCurrencyFull(data.bbUpper, currency)}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-xs sm:text-sm text-gray-600">BB Middle:</span>
+                      <span className="text-xs sm:text-sm font-medium text-orange-500">{formatCurrencyFull(data.bbMiddle, currency)}</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-xs sm:text-sm text-gray-600">BB Lower:</span>
+                      <span className="text-xs sm:text-sm font-medium text-orange-600">{formatCurrencyFull(data.bbLower, currency)}</span>
+                    </div>
+                  </>
+                )}
+                {technicalAnalysis.showRSI && !isNaN(data.rsi) && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">RSI:</span>
+                    <span className={`text-xs sm:text-sm font-medium ${
+                      data.rsi > 70 ? 'text-red-600' : data.rsi < 30 ? 'text-green-600' : 'text-pink-600'
+                    }`}>
+                      {data.rsi.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {technicalAnalysis.showMACD && !isNaN(data.macd) && (
+                  <>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-xs sm:text-sm text-gray-600">MACD:</span>
+                      <span className="text-xs sm:text-sm font-medium text-green-600">{data.macd.toFixed(4)}</span>
+                    </div>
+                    {!isNaN(data.macdSignal) && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-xs sm:text-sm text-gray-600">Signal:</span>
+                        <span className="text-xs sm:text-sm font-medium text-green-500">{data.macdSignal.toFixed(4)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
   };
 
   // Adjust margins for different screen sizes
@@ -112,7 +248,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height, currency =
       }}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={margins}>
+        <LineChart data={chartDataWithIndicators} margin={margins}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis
             dataKey="timestamp"
@@ -134,25 +270,11 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height, currency =
             domain={['auto', 'auto']}
           />
           <Tooltip
-            formatter={formatTooltip}
-            labelFormatter={(label) => new Date(label).toLocaleString()}
-            contentStyle={{
-              backgroundColor: 'white',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              fontSize: isSmallMobile ? '11px' : isMobile ? '12px' : '14px',
-              padding: isSmallMobile ? '8px' : isMobile ? '10px' : '12px',
-              maxWidth: isMobile ? '200px' : 'none',
-              pointerEvents: 'none',
-            }}
+            content={<CustomTooltip />}
             wrapperStyle={{
               zIndex: 1000,
             }}
-            position={{ x: undefined, y: undefined }}
-            // Better touch interaction
             allowEscapeViewBox={{ x: false, y: false }}
-            // Prevent tooltip from being cut off on mobile
             offset={isMobile ? 10 : 0}
           />
           <Line
@@ -168,6 +290,97 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, height, currency =
               stroke: '#fff' 
             }}
           />
+          {/* Technical Indicators */}
+          {technicalAnalysis?.showSMA20 && (
+            <Line
+              type="monotone"
+              dataKey="sma20"
+              stroke="#2563eb"
+              strokeWidth={1.5}
+              dot={false}
+              strokeDasharray="3 3"
+              opacity={0.8}
+            />
+          )}
+          {technicalAnalysis?.showSMA50 && (
+            <Line
+              type="monotone"
+              dataKey="sma50"
+              stroke="#7c3aed"
+              strokeWidth={1.5}
+              dot={false}
+              strokeDasharray="3 3"
+              opacity={0.8}
+            />
+          )}
+          {technicalAnalysis?.showSMA200 && (
+            <Line
+              type="monotone"
+              dataKey="sma200"
+              stroke="#4f46e5"
+              strokeWidth={1.5}
+              dot={false}
+              strokeDasharray="3 3"
+              opacity={0.8}
+            />
+          )}
+          {technicalAnalysis?.showEMA20 && (
+            <Line
+              type="monotone"
+              dataKey="ema20"
+              stroke="#06b6d4"
+              strokeWidth={1.5}
+              dot={false}
+              opacity={0.8}
+            />
+          )}
+          {technicalAnalysis?.showEMA50 && (
+            <Line
+              type="monotone"
+              dataKey="ema50"
+              stroke="#14b8a6"
+              strokeWidth={1.5}
+              dot={false}
+              opacity={0.8}
+            />
+          )}
+          {technicalAnalysis?.showBollingerBands && (
+            <>
+              <Area
+                type="monotone"
+                dataKey="bbUpper"
+                stroke="none"
+                fill="#f97316"
+                fillOpacity={0.1}
+                connectNulls={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="bbUpper"
+                stroke="#f97316"
+                strokeWidth={1}
+                dot={false}
+                opacity={0.6}
+              />
+              <Line
+                type="monotone"
+                dataKey="bbMiddle"
+                stroke="#fb923c"
+                strokeWidth={1}
+                dot={false}
+                strokeDasharray="2 2"
+                opacity={0.6}
+              />
+              <Line
+                type="monotone"
+                dataKey="bbLower"
+                stroke="#f97316"
+                strokeWidth={1}
+                dot={false}
+                opacity={0.6}
+              />
+            </>
+          )}
         </LineChart>
       </ResponsiveContainer>
     </div>

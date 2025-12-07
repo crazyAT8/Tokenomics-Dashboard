@@ -13,7 +13,9 @@ import { CurrencySelector } from '@/components/dashboard/CurrencySelector';
 import { CurrencyRates } from '@/components/dashboard/CurrencyRates';
 import { PriceChart } from '@/components/charts/PriceChart';
 import { CandlestickChart } from '@/components/charts/CandlestickChart';
+import { TechnicalIndicatorsChart } from '@/components/charts/TechnicalIndicatorsChart';
 import { ChartTypeSelector } from '@/components/dashboard/ChartTypeSelector';
+import { TechnicalAnalysisControls } from '@/components/dashboard/TechnicalAnalysisControls';
 import { TokenomicsOverview } from '@/components/dashboard/TokenomicsOverview';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Favorites } from '@/components/dashboard/Favorites';
@@ -47,6 +49,8 @@ export default function Dashboard() {
     setCurrency,
     chartType,
     setChartType,
+    technicalAnalysis,
+    toggleTechnicalIndicator,
   } = useDashboardStore();
   const { marketData, isLoading, error, errorDetails: hookErrorDetails, retryCount: hookRetryCount, refreshData } = useCoinData();
   const networkStatusHook = useNetworkStatus();
@@ -265,6 +269,16 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Technical Analysis Controls */}
+        {marketData && (
+          <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
+            <TechnicalAnalysisControls
+              settings={technicalAnalysis}
+              onToggle={toggleTechnicalIndicator}
+            />
+          </div>
+        )}
+
         {isLoading && !marketData ? (
           <div className="flex items-center justify-center py-12 sm:py-16">
             <div className="text-center">
@@ -296,9 +310,28 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6 min-w-0">
                     {chartType === 'candlestick' && marketData.ohlcData && marketData.ohlcData.length > 0 ? (
-                      <CandlestickChart data={marketData.ohlcData} currency={currency} />
+                      <CandlestickChart 
+                        data={marketData.ohlcData} 
+                        currency={currency}
+                        technicalAnalysis={technicalAnalysis}
+                      />
                     ) : (
-                      <PriceChart data={marketData.priceHistory} currency={currency} />
+                      <PriceChart 
+                        data={marketData.priceHistory} 
+                        currency={currency}
+                        technicalAnalysis={technicalAnalysis}
+                      />
+                    )}
+                    {/* RSI/MACD Chart */}
+                    {(technicalAnalysis.showRSI || technicalAnalysis.showMACD) && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <TechnicalIndicatorsChart
+                          priceData={chartType === 'line' ? marketData.priceHistory : undefined}
+                          ohlcData={chartType === 'candlestick' ? marketData.ohlcData : undefined}
+                          currency={currency}
+                          technicalAnalysis={technicalAnalysis}
+                        />
+                      </div>
                     )}
                   </CardContent>
                 </Card>

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DashboardState, MarketData, ChartType } from './types';
+import { DashboardState, MarketData, ChartType, TechnicalAnalysisSettings } from './types';
 import { ApiError } from './utils/errorHandler';
 import { TimeRange } from '@/components/dashboard/TimeRangeSelector';
 
@@ -16,6 +16,7 @@ interface ExtendedDashboardState extends DashboardState {
   timeRange: TimeRange;
   currency: Currency;
   chartType: ChartType;
+  technicalAnalysis: TechnicalAnalysisSettings;
 }
 
 interface DashboardStore extends ExtendedDashboardState {
@@ -31,6 +32,8 @@ interface DashboardStore extends ExtendedDashboardState {
   setTimeRange: (range: TimeRange) => void;
   setCurrency: (currency: Currency) => void;
   setChartType: (chartType: ChartType) => void;
+  setTechnicalAnalysis: (settings: Partial<TechnicalAnalysisSettings>) => void;
+  toggleTechnicalIndicator: (indicator: keyof TechnicalAnalysisSettings) => void;
 }
 
 export const useDashboardStore = create<DashboardStore>()(
@@ -50,6 +53,17 @@ export const useDashboardStore = create<DashboardStore>()(
       timeRange: { type: '7d', days: 7 },
       currency: 'usd',
       chartType: 'line',
+      technicalAnalysis: {
+        showSMA20: false,
+        showSMA50: false,
+        showSMA200: false,
+        showEMA20: false,
+        showEMA50: false,
+        showRSI: false,
+        showMACD: false,
+        showBollingerBands: false,
+        showSupportResistance: false,
+      },
 
       setSelectedCoin: (coin) => set({ selectedCoin: coin }),
       setMarketData: (data) => set({ marketData: data, error: null, errorDetails: null, retryCount: 0 }),
@@ -64,6 +78,17 @@ export const useDashboardStore = create<DashboardStore>()(
       setTimeRange: (range) => set({ timeRange: range }),
       setCurrency: (currency) => set({ currency }),
       setChartType: (chartType) => set({ chartType }),
+      setTechnicalAnalysis: (settings) =>
+        set((state) => ({
+          technicalAnalysis: { ...state.technicalAnalysis, ...settings },
+        })),
+      toggleTechnicalIndicator: (indicator) =>
+        set((state) => ({
+          technicalAnalysis: {
+            ...state.technicalAnalysis,
+            [indicator]: !state.technicalAnalysis[indicator],
+          },
+        })),
     }),
     {
       name: 'dashboard-storage',
@@ -72,6 +97,7 @@ export const useDashboardStore = create<DashboardStore>()(
         selectedCoin: state.selectedCoin,
         timeRange: state.timeRange,
         chartType: state.chartType,
+        technicalAnalysis: state.technicalAnalysis,
       }),
     }
   )
