@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DashboardState, MarketData, ChartType, TechnicalAnalysisSettings } from './types';
+import { DashboardState, MarketData, ChartType, TechnicalAnalysisSettings, ChartCustomizationSettings } from './types';
 import { ApiError } from './utils/errorHandler';
 import { TimeRange } from '@/components/dashboard/TimeRangeSelector';
 
@@ -17,6 +17,7 @@ interface ExtendedDashboardState extends DashboardState {
   currency: Currency;
   chartType: ChartType;
   technicalAnalysis: TechnicalAnalysisSettings;
+  chartCustomization: ChartCustomizationSettings;
 }
 
 interface DashboardStore extends ExtendedDashboardState {
@@ -34,6 +35,8 @@ interface DashboardStore extends ExtendedDashboardState {
   setChartType: (chartType: ChartType) => void;
   setTechnicalAnalysis: (settings: Partial<TechnicalAnalysisSettings>) => void;
   toggleTechnicalIndicator: (indicator: keyof TechnicalAnalysisSettings) => void;
+  setChartCustomization: (settings: Partial<ChartCustomizationSettings>) => void;
+  resetChartCustomization: () => void;
 }
 
 export const useDashboardStore = create<DashboardStore>()(
@@ -64,6 +67,19 @@ export const useDashboardStore = create<DashboardStore>()(
         showBollingerBands: false,
         showSupportResistance: false,
       },
+      chartCustomization: {
+        lineColor: '#3b82f6',
+        backgroundColor: '#ffffff',
+        gridColor: '#f0f0f0',
+        axisColor: '#666666',
+        showGrid: true,
+        showAxisLabels: true,
+        chartHeight: null,
+        lineWidth: 2.5,
+        fontSize: 12,
+        theme: 'light',
+        enableAnimation: true,
+      },
 
       setSelectedCoin: (coin) => set({ selectedCoin: coin }),
       setMarketData: (data) => set({ marketData: data, error: null, errorDetails: null, retryCount: 0 }),
@@ -89,6 +105,26 @@ export const useDashboardStore = create<DashboardStore>()(
             [indicator]: !state.technicalAnalysis[indicator],
           },
         })),
+      setChartCustomization: (settings) =>
+        set((state) => ({
+          chartCustomization: { ...state.chartCustomization, ...settings },
+        })),
+      resetChartCustomization: () =>
+        set({
+          chartCustomization: {
+            lineColor: '#3b82f6',
+            backgroundColor: '#ffffff',
+            gridColor: '#f0f0f0',
+            axisColor: '#666666',
+            showGrid: true,
+            showAxisLabels: true,
+            chartHeight: null,
+            lineWidth: 2.5,
+            fontSize: 12,
+            theme: 'light',
+            enableAnimation: true,
+          },
+        }),
     }),
     {
       name: 'dashboard-storage',
@@ -98,6 +134,7 @@ export const useDashboardStore = create<DashboardStore>()(
         timeRange: state.timeRange,
         chartType: state.chartType,
         technicalAnalysis: state.technicalAnalysis,
+        chartCustomization: state.chartCustomization,
       }),
     }
   )

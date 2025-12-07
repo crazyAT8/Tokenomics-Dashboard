@@ -87,3 +87,26 @@ export interface ExchangeRates {
   rates: Record<string, number>;
   timestamp: number;
 }
+
+export interface ChartCustomizationSettings {
+  // Colors
+  lineColor: string;
+  backgroundColor: string;
+  gridColor: string;
+  axisColor: string;
+  
+  // Display options
+  showGrid: boolean;
+  showAxisLabels: boolean;
+  chartHeight: number | null; // null means auto
+  
+  // Styling
+  lineWidth: number;
+  fontSize: number;
+  
+  // Theme
+  theme: 'light' | 'dark';
+  
+  // Animation
+  enableAnimation: boolean;
+}

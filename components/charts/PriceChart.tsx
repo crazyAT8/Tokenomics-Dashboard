@@ -10,7 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { PriceHistory, TechnicalAnalysisSettings } from '@/lib/types';
+import { PriceHistory, TechnicalAnalysisSettings, ChartCustomizationSettings } from '@/lib/types';
 import { Currency } from '@/lib/store';
 import { formatCurrency, formatCurrencyFull, CURRENCY_INFO } from '@/lib/utils/currency';
 import { calculateAllIndicators } from '@/lib/utils/technicalAnalysis';
@@ -21,15 +21,18 @@ interface PriceChartProps {
   height?: number;
   currency?: Currency;
   technicalAnalysis?: TechnicalAnalysisSettings;
+  customization?: ChartCustomizationSettings;
 }
 
 export const PriceChart: React.FC<PriceChartProps> = ({ 
   data, 
   height, 
   currency = 'usd',
-  technicalAnalysis 
+  technicalAnalysis,
+  customization
 }) => {
-  const [chartHeight, setChartHeight] = useState(height || 300);
+  const defaultHeight = customization?.chartHeight || height || 300;
+  const [chartHeight, setChartHeight] = useState(defaultHeight);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [isSmallMobile, setIsSmallMobile] = useState(false);
@@ -43,7 +46,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
       setIsSmallMobile(smallMobile);
       setIsMobile(mobile);
       setIsTablet(tablet);
-      if (!height) {
+      if (!height && !customization?.chartHeight) {
         // Dynamic height based on screen size
         if (smallMobile) {
           setChartHeight(200);
@@ -54,13 +57,22 @@ export const PriceChart: React.FC<PriceChartProps> = ({
         } else {
           setChartHeight(350);
         }
+      } else if (customization?.chartHeight) {
+        setChartHeight(customization.chartHeight);
       }
     };
 
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
-  }, [height]);
+  }, [height, customization?.chartHeight]);
+
+  // Update chart height when customization changes
+  useEffect(() => {
+    if (customization?.chartHeight) {
+      setChartHeight(customization.chartHeight);
+    }
+  }, [customization?.chartHeight]);
 
   // Calculate technical indicators
   const indicators = useMemo(() => {
@@ -236,6 +248,16 @@ export const PriceChart: React.FC<PriceChartProps> = ({
     ? { top: 10, right: 20, left: 20, bottom: 40 }
     : { top: 10, right: 30, left: 30, bottom: 30 };
 
+  // Apply customization settings
+  const lineColor = customization?.lineColor || '#3b82f6';
+  const gridColor = customization?.gridColor || '#f0f0f0';
+  const axisColor = customization?.axisColor || '#666';
+  const showGrid = customization?.showGrid !== false;
+  const showAxisLabels = customization?.showAxisLabels !== false;
+  const fontSize = customization?.fontSize || (isSmallMobile ? 9 : isMobile ? 10 : 12);
+  const lineWidth = customization?.lineWidth || (isSmallMobile ? 1.5 : isMobile ? 2 : 2.5);
+  const backgroundColor = customization?.backgroundColor || '#ffffff';
+
   return (
     <div 
       className="w-full min-w-0 overflow-hidden chart-container" 
@@ -248,27 +270,35 @@ export const PriceChart: React.FC<PriceChartProps> = ({
       }}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartDataWithIndicators} margin={margins}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis
-            dataKey="timestamp"
-            tickFormatter={formatXAxis}
-            stroke="#666"
-            fontSize={isSmallMobile ? 9 : isMobile ? 10 : 12}
-            angle={isMobile ? -45 : 0}
-            textAnchor={isMobile ? 'end' : 'middle'}
-            height={isSmallMobile ? 70 : isMobile ? 60 : 30}
-            interval={isSmallMobile ? 'preserveStartEnd' : isMobile ? 'preserveStartEnd' : 0}
-            tick={{ fill: '#666' }}
-          />
-          <YAxis
-            tickFormatter={formatYAxis}
-            stroke="#666"
-            fontSize={isSmallMobile ? 9 : isMobile ? 10 : 12}
-            width={isSmallMobile ? 45 : isMobile ? 60 : 80}
-            tick={{ fill: '#666' }}
-            domain={['auto', 'auto']}
-          />
+        <LineChart 
+          data={chartDataWithIndicators} 
+          margin={margins}
+          style={{ backgroundColor }}
+        >
+          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />}
+          {showAxisLabels && (
+            <XAxis
+              dataKey="timestamp"
+              tickFormatter={formatXAxis}
+              stroke={axisColor}
+              fontSize={fontSize}
+              angle={isMobile ? -45 : 0}
+              textAnchor={isMobile ? 'end' : 'middle'}
+              height={isSmallMobile ? 70 : isMobile ? 60 : 30}
+              interval={isSmallMobile ? 'preserveStartEnd' : isMobile ? 'preserveStartEnd' : 0}
+              tick={{ fill: axisColor }}
+            />
+          )}
+          {showAxisLabels && (
+            <YAxis
+              tickFormatter={formatYAxis}
+              stroke={axisColor}
+              fontSize={fontSize}
+              width={isSmallMobile ? 45 : isMobile ? 60 : 80}
+              tick={{ fill: axisColor }}
+              domain={['auto', 'auto']}
+            />
+          )}
           <Tooltip
             content={<CustomTooltip />}
             wrapperStyle={{
@@ -280,12 +310,13 @@ export const PriceChart: React.FC<PriceChartProps> = ({
           <Line
             type="monotone"
             dataKey="price"
-            stroke="#3b82f6"
-            strokeWidth={isSmallMobile ? 1.5 : isMobile ? 2 : 2.5}
+            stroke={lineColor}
+            strokeWidth={lineWidth}
             dot={false}
+            isAnimationActive={customization?.enableAnimation !== false}
             activeDot={{ 
               r: isSmallMobile ? 4 : isMobile ? 5 : 6, 
-              fill: '#3b82f6', 
+              fill: lineColor, 
               strokeWidth: 2, 
               stroke: '#fff' 
             }}

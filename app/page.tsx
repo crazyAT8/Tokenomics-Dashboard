@@ -16,6 +16,7 @@ import { CandlestickChart } from '@/components/charts/CandlestickChart';
 import { TechnicalIndicatorsChart } from '@/components/charts/TechnicalIndicatorsChart';
 import { ChartTypeSelector } from '@/components/dashboard/ChartTypeSelector';
 import { TechnicalAnalysisControls } from '@/components/dashboard/TechnicalAnalysisControls';
+import { ChartCustomizationControls } from '@/components/dashboard/ChartCustomizationControls';
 import { TokenomicsOverview } from '@/components/dashboard/TokenomicsOverview';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Favorites } from '@/components/dashboard/Favorites';
@@ -51,6 +52,9 @@ export default function Dashboard() {
     setChartType,
     technicalAnalysis,
     toggleTechnicalIndicator,
+    chartCustomization,
+    setChartCustomization,
+    resetChartCustomization,
   } = useDashboardStore();
   const { marketData, isLoading, error, errorDetails: hookErrorDetails, retryCount: hookRetryCount, refreshData } = useCoinData();
   const networkStatusHook = useNetworkStatus();
@@ -279,6 +283,17 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Chart Customization Controls */}
+        {marketData && (
+          <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
+            <ChartCustomizationControls
+              settings={chartCustomization}
+              onUpdate={setChartCustomization}
+              onReset={resetChartCustomization}
+            />
+          </div>
+        )}
+
         {isLoading && !marketData ? (
           <div className="flex items-center justify-center py-12 sm:py-16">
             <div className="text-center">
@@ -314,12 +329,14 @@ export default function Dashboard() {
                         data={marketData.ohlcData} 
                         currency={currency}
                         technicalAnalysis={technicalAnalysis}
+                        customization={chartCustomization}
                       />
                     ) : (
                       <PriceChart 
                         data={marketData.priceHistory} 
                         currency={currency}
                         technicalAnalysis={technicalAnalysis}
+                        customization={chartCustomization}
                       />
                     )}
                     {/* RSI/MACD Chart */}
@@ -330,6 +347,7 @@ export default function Dashboard() {
                           ohlcData={chartType === 'candlestick' ? marketData.ohlcData : undefined}
                           currency={currency}
                           technicalAnalysis={technicalAnalysis}
+                          customization={chartCustomization}
                         />
                       </div>
                     )}

@@ -13,7 +13,7 @@ import {
   ReferenceLine,
   Cell,
 } from 'recharts';
-import { OHLCData, TechnicalAnalysisSettings } from '@/lib/types';
+import { OHLCData, TechnicalAnalysisSettings, ChartCustomizationSettings } from '@/lib/types';
 import { Currency } from '@/lib/store';
 import { formatCurrencyFull, CURRENCY_INFO } from '@/lib/utils/currency';
 import { calculateAllIndicatorsOHLC } from '@/lib/utils/technicalAnalysis';
@@ -24,15 +24,18 @@ interface CandlestickChartProps {
   height?: number;
   currency?: Currency;
   technicalAnalysis?: TechnicalAnalysisSettings;
+  customization?: ChartCustomizationSettings;
 }
 
 export const CandlestickChart: React.FC<CandlestickChartProps> = ({ 
   data, 
   height, 
   currency = 'usd',
-  technicalAnalysis
+  technicalAnalysis,
+  customization
 }) => {
-  const [chartHeight, setChartHeight] = useState(height || 300);
+  const defaultHeight = customization?.chartHeight || height || 300;
+  const [chartHeight, setChartHeight] = useState(defaultHeight);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [isSmallMobile, setIsSmallMobile] = useState(false);
@@ -46,7 +49,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       setIsSmallMobile(smallMobile);
       setIsMobile(mobile);
       setIsTablet(tablet);
-      if (!height) {
+      if (!height && !customization?.chartHeight) {
         if (smallMobile) {
           setChartHeight(200);
         } else if (mobile) {
@@ -56,13 +59,22 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
         } else {
           setChartHeight(350);
         }
+      } else if (customization?.chartHeight) {
+        setChartHeight(customization.chartHeight);
       }
     };
 
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
-  }, [height]);
+  }, [height, customization?.chartHeight]);
+
+  // Update chart height when customization changes
+  useEffect(() => {
+    if (customization?.chartHeight) {
+      setChartHeight(customization.chartHeight);
+    }
+  }, [customization?.chartHeight]);
 
   // Calculate technical indicators
   const indicators = useMemo(() => {
@@ -328,6 +340,16 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     ? { top: 10, right: 20, left: 20, bottom: 70 }
     : { top: 10, right: 30, left: 30, bottom: 60 };
 
+  // Apply customization settings
+  const lineColor = customization?.lineColor || '#3b82f6';
+  const gridColor = customization?.gridColor || '#f0f0f0';
+  const axisColor = customization?.axisColor || '#666';
+  const showGrid = customization?.showGrid !== false;
+  const showAxisLabels = customization?.showAxisLabels !== false;
+  const fontSize = customization?.fontSize || (isSmallMobile ? 9 : isMobile ? 10 : 12);
+  const lineWidth = customization?.lineWidth || 2;
+  const backgroundColor = customization?.backgroundColor || '#ffffff';
+
 
   // Render candlesticks as custom SVG overlay
   const renderCandlesticks = () => {
@@ -349,44 +371,54 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       }}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={volumeWithMA} margin={margins}>
+        <ComposedChart 
+          data={volumeWithMA} 
+          margin={margins}
+          style={{ backgroundColor }}
+        >
           <defs>
             <clipPath id="candlestick-clip">
               <rect x="0" y="0" width="100%" height="100%" />
             </clipPath>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis
-            dataKey="timestamp"
-            tickFormatter={formatXAxis}
-            stroke="#666"
-            fontSize={isSmallMobile ? 9 : isMobile ? 10 : 12}
-            angle={isMobile ? -45 : 0}
-            textAnchor={isMobile ? 'end' : 'middle'}
-            height={isSmallMobile ? 70 : isMobile ? 60 : 30}
-            interval={isSmallMobile ? 'preserveStartEnd' : isMobile ? 'preserveStartEnd' : 0}
-            tick={{ fill: '#666' }}
-          />
-          <YAxis
-            yAxisId="price"
-            tickFormatter={formatYAxis}
-            stroke="#666"
-            fontSize={isSmallMobile ? 9 : isMobile ? 10 : 12}
-            width={isSmallMobile ? 45 : isMobile ? 60 : 80}
-            tick={{ fill: '#666' }}
-            domain={priceDomain}
-            orientation="left"
-          />
-          <YAxis
-            yAxisId="volume"
-            tickFormatter={formatVolumeAxis}
-            stroke="#666"
-            fontSize={isSmallMobile ? 8 : isMobile ? 9 : 10}
-            width={isSmallMobile ? 35 : isMobile ? 45 : 60}
-            tick={{ fill: '#666' }}
-            orientation="right"
-            domain={[0, volumeStats.max * 1.1]}
-          />
+          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />}
+          {showAxisLabels && (
+            <XAxis
+              dataKey="timestamp"
+              tickFormatter={formatXAxis}
+              stroke={axisColor}
+              fontSize={fontSize}
+              angle={isMobile ? -45 : 0}
+              textAnchor={isMobile ? 'end' : 'middle'}
+              height={isSmallMobile ? 70 : isMobile ? 60 : 30}
+              interval={isSmallMobile ? 'preserveStartEnd' : isMobile ? 'preserveStartEnd' : 0}
+              tick={{ fill: axisColor }}
+            />
+          )}
+          {showAxisLabels && (
+            <>
+              <YAxis
+                yAxisId="price"
+                tickFormatter={formatYAxis}
+                stroke={axisColor}
+                fontSize={fontSize}
+                width={isSmallMobile ? 45 : isMobile ? 60 : 80}
+                tick={{ fill: axisColor }}
+                domain={priceDomain}
+                orientation="left"
+              />
+              <YAxis
+                yAxisId="volume"
+                tickFormatter={formatVolumeAxis}
+                stroke={axisColor}
+                fontSize={fontSize - 2}
+                width={isSmallMobile ? 35 : isMobile ? 45 : 60}
+                tick={{ fill: axisColor }}
+                orientation="right"
+                domain={[0, volumeStats.max * 1.1]}
+              />
+            </>
+          )}
           <Tooltip
             content={<CustomTooltip />}
             wrapperStyle={{
@@ -418,10 +450,11 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             yAxisId="price"
             type="monotone"
             dataKey="close"
-            stroke="#3b82f6"
-            strokeWidth={2}
+            stroke={lineColor}
+            strokeWidth={lineWidth}
             dot={false}
-            activeDot={{ r: 5 }}
+            isAnimationActive={customization?.enableAnimation !== false}
+            activeDot={{ r: 5, fill: lineColor }}
           />
           {/* Technical Indicators */}
           {technicalAnalysis?.showSMA20 && (

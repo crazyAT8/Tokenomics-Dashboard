@@ -12,7 +12,7 @@ import {
   Bar,
   ReferenceLine,
 } from 'recharts';
-import { PriceHistory, OHLCData, TechnicalAnalysisSettings } from '@/lib/types';
+import { PriceHistory, OHLCData, TechnicalAnalysisSettings, ChartCustomizationSettings } from '@/lib/types';
 import { Currency } from '@/lib/store';
 import { formatCurrencyFull, CURRENCY_INFO } from '@/lib/utils/currency';
 import { calculateAllIndicators, calculateAllIndicatorsOHLC } from '@/lib/utils/technicalAnalysis';
@@ -23,6 +23,7 @@ interface TechnicalIndicatorsChartProps {
   height?: number;
   currency?: Currency;
   technicalAnalysis?: TechnicalAnalysisSettings;
+  customization?: ChartCustomizationSettings;
 }
 
 export const TechnicalIndicatorsChart: React.FC<TechnicalIndicatorsChartProps> = ({
@@ -31,8 +32,10 @@ export const TechnicalIndicatorsChart: React.FC<TechnicalIndicatorsChartProps> =
   height = 200,
   currency = 'usd',
   technicalAnalysis,
+  customization,
 }) => {
-  const [chartHeight, setChartHeight] = useState(height);
+  const defaultHeight = customization?.chartHeight || height;
+  const [chartHeight, setChartHeight] = useState(defaultHeight);
   const [isMobile, setIsMobile] = useState(false);
   const [isSmallMobile, setIsSmallMobile] = useState(false);
 
@@ -43,7 +46,7 @@ export const TechnicalIndicatorsChart: React.FC<TechnicalIndicatorsChartProps> =
       const mobile = width < 640;
       setIsSmallMobile(smallMobile);
       setIsMobile(mobile);
-      if (!height) {
+      if (!height && !customization?.chartHeight) {
         if (smallMobile) {
           setChartHeight(150);
         } else if (mobile) {
@@ -51,13 +54,22 @@ export const TechnicalIndicatorsChart: React.FC<TechnicalIndicatorsChartProps> =
         } else {
           setChartHeight(200);
         }
+      } else if (customization?.chartHeight) {
+        setChartHeight(customization.chartHeight);
       }
     };
 
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
-  }, [height]);
+  }, [height, customization?.chartHeight]);
+
+  // Update chart height when customization changes
+  useEffect(() => {
+    if (customization?.chartHeight) {
+      setChartHeight(customization.chartHeight);
+    }
+  }, [customization?.chartHeight]);
 
   // Calculate indicators
   const indicators = useMemo(() => {
@@ -112,6 +124,14 @@ export const TechnicalIndicatorsChart: React.FC<TechnicalIndicatorsChartProps> =
     ? { top: 10, right: 10, left: 10, bottom: 50 }
     : { top: 10, right: 20, left: 20, bottom: 40 };
 
+  // Apply customization settings
+  const gridColor = customization?.gridColor || '#f0f0f0';
+  const axisColor = customization?.axisColor || '#666';
+  const showGrid = customization?.showGrid !== false;
+  const showAxisLabels = customization?.showAxisLabels !== false;
+  const fontSize = customization?.fontSize || (isSmallMobile ? 9 : isMobile ? 10 : 12);
+  const backgroundColor = customization?.backgroundColor || '#ffffff';
+
   const showRSI = technicalAnalysis?.showRSI;
   const showMACD = technicalAnalysis?.showMACD;
 
@@ -122,29 +142,35 @@ export const TechnicalIndicatorsChart: React.FC<TechnicalIndicatorsChartProps> =
   return (
     <div className="w-full min-w-0 overflow-hidden" style={{ height: `${chartHeight}px` }}>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={chartData} margin={margins}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis
-            dataKey="timestamp"
-            tickFormatter={formatXAxis}
-            stroke="#666"
-            fontSize={isSmallMobile ? 9 : isMobile ? 10 : 12}
-            angle={isMobile ? -45 : 0}
-            textAnchor={isMobile ? 'end' : 'middle'}
-            height={isSmallMobile ? 50 : isMobile ? 40 : 30}
-            interval={isSmallMobile ? 'preserveStartEnd' : isMobile ? 'preserveStartEnd' : 0}
-            tick={{ fill: '#666' }}
-          />
-          {showRSI && (
+        <ComposedChart 
+          data={chartData} 
+          margin={margins}
+          style={{ backgroundColor }}
+        >
+          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />}
+          {showAxisLabels && (
+            <XAxis
+              dataKey="timestamp"
+              tickFormatter={formatXAxis}
+              stroke={axisColor}
+              fontSize={fontSize}
+              angle={isMobile ? -45 : 0}
+              textAnchor={isMobile ? 'end' : 'middle'}
+              height={isSmallMobile ? 50 : isMobile ? 40 : 30}
+              interval={isSmallMobile ? 'preserveStartEnd' : isMobile ? 'preserveStartEnd' : 0}
+              tick={{ fill: axisColor }}
+            />
+          )}
+          {showRSI && showAxisLabels && (
             <>
               <YAxis
                 yAxisId="rsi"
                 domain={[0, 100]}
                 tickFormatter={(value) => `${value}`}
                 stroke="#ec4899"
-                fontSize={isSmallMobile ? 9 : isMobile ? 10 : 12}
+                fontSize={fontSize}
                 width={isSmallMobile ? 35 : isMobile ? 45 : 60}
-                tick={{ fill: '#666' }}
+                tick={{ fill: axisColor }}
                 orientation="left"
               />
               <ReferenceLine yAxisId="rsi" y={70} stroke="#ef4444" strokeDasharray="3 3" opacity={0.5} />
@@ -155,21 +181,22 @@ export const TechnicalIndicatorsChart: React.FC<TechnicalIndicatorsChartProps> =
                 type="monotone"
                 dataKey="rsi"
                 stroke="#ec4899"
-                strokeWidth={2}
+                strokeWidth={customization?.lineWidth || 2}
                 dot={false}
+                isAnimationActive={customization?.enableAnimation !== false}
                 activeDot={{ r: 4 }}
               />
             </>
           )}
-          {showMACD && (
+          {showMACD && showAxisLabels && (
             <>
               <YAxis
                 yAxisId="macd"
                 tickFormatter={(value) => value.toFixed(2)}
                 stroke="#10b981"
-                fontSize={isSmallMobile ? 9 : isMobile ? 10 : 12}
+                fontSize={fontSize}
                 width={isSmallMobile ? 35 : isMobile ? 45 : 60}
-                tick={{ fill: '#666' }}
+                tick={{ fill: axisColor }}
                 orientation={showRSI ? 'right' : 'left'}
               />
               <ReferenceLine yAxisId="macd" y={0} stroke="#9ca3af" strokeDasharray="2 2" opacity={0.5} />
@@ -178,8 +205,9 @@ export const TechnicalIndicatorsChart: React.FC<TechnicalIndicatorsChartProps> =
                 type="monotone"
                 dataKey="macd"
                 stroke="#10b981"
-                strokeWidth={2}
+                strokeWidth={customization?.lineWidth || 2}
                 dot={false}
+                isAnimationActive={customization?.enableAnimation !== false}
                 activeDot={{ r: 4 }}
               />
               <Line
@@ -187,10 +215,11 @@ export const TechnicalIndicatorsChart: React.FC<TechnicalIndicatorsChartProps> =
                 type="monotone"
                 dataKey="macdSignal"
                 stroke="#059669"
-                strokeWidth={1.5}
+                strokeWidth={(customization?.lineWidth || 2) * 0.6}
                 dot={false}
                 strokeDasharray="3 3"
                 opacity={0.8}
+                isAnimationActive={customization?.enableAnimation !== false}
               />
               <Bar
                 yAxisId="macd"
