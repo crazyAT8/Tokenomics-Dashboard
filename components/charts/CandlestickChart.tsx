@@ -9,7 +9,9 @@ import {
   Tooltip,
   ResponsiveContainer,
   Line,
+  Bar,
   ReferenceLine,
+  Cell,
 } from 'recharts';
 import { OHLCData } from '@/lib/types';
 import { Currency } from '@/lib/store';
@@ -58,9 +60,9 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     return () => window.removeEventListener('resize', updateDimensions);
   }, [height]);
 
-  // Transform data for Recharts
+  // Transform data for Recharts with volume indicators
   const chartData = useMemo(() => {
-    return data.map((item) => {
+    return data.map((item, index) => {
       const isPositive = item.close >= item.open;
       return {
         timestamp: item.timestamp,
@@ -69,11 +71,36 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
         low: item.low,
         close: item.close,
         isPositive,
+        volume: item.volume || 0,
         // For visualization - use close as main value
         value: item.close,
       };
     });
   }, [data]);
+
+  // Calculate volume moving average (20-period)
+  const volumeWithMA = useMemo(() => {
+    const period = 20;
+    return chartData.map((item, index) => {
+      if (index < period - 1) {
+        return { ...item, volumeMA: item.volume };
+      }
+      const sum = chartData
+        .slice(index - period + 1, index + 1)
+        .reduce((acc, d) => acc + (d.volume || 0), 0);
+      return { ...item, volumeMA: sum / period };
+    });
+  }, [chartData]);
+
+  // Calculate volume statistics for scaling
+  const volumeStats = useMemo(() => {
+    const volumes = chartData.map(d => d.volume || 0).filter(v => v > 0);
+    if (volumes.length === 0) return { max: 0, min: 0 };
+    return {
+      max: Math.max(...volumes),
+      min: Math.min(...volumes),
+    };
+  }, [chartData]);
 
   const formatXAxis = (tickItem: number) => {
     const date = new Date(tickItem);
@@ -106,10 +133,20 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     return `${info.symbol}${value.toLocaleString()}`;
   };
 
+  const formatVolumeAxis = (value: number) => {
+    if (value === 0) return '0';
+    if (value >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
+    if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
+    if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
+    if (value >= 1e3) return `${(value / 1e3).toFixed(2)}K`;
+    return value.toFixed(0);
+  };
+
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       const isPositive = data.close >= data.open;
+      const hasVolume = data.volume !== undefined && data.volume > 0;
       return (
         <div className="bg-white p-2 sm:p-3 border border-gray-200 rounded-lg shadow-lg">
           <p className="text-xs sm:text-sm text-gray-500 mb-1">
@@ -140,6 +177,20 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
                 {isPositive ? '+' : ''}{((data.close - data.open) / data.open * 100).toFixed(2)}%
               </span>
             </div>
+            {hasVolume && (
+              <>
+                <div className="flex justify-between gap-4 pt-1 border-t border-gray-200">
+                  <span className="text-xs sm:text-sm text-gray-600">Volume:</span>
+                  <span className="text-xs sm:text-sm font-medium">{formatVolumeAxis(data.volume)}</span>
+                </div>
+                {data.volumeMA !== undefined && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-xs sm:text-sm text-gray-600">Vol MA(20):</span>
+                    <span className="text-xs sm:text-sm font-medium text-gray-500">{formatVolumeAxis(data.volumeMA)}</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       );
@@ -148,12 +199,12 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
   };
 
   const margins = isSmallMobile
-    ? { top: 10, right: 5, left: 5, bottom: 50 }
+    ? { top: 10, right: 5, left: 5, bottom: 80 }
     : isMobile 
-    ? { top: 10, right: 10, left: 10, bottom: 50 }
+    ? { top: 10, right: 10, left: 10, bottom: 80 }
     : isTablet
-    ? { top: 10, right: 20, left: 20, bottom: 40 }
-    : { top: 10, right: 30, left: 30, bottom: 30 };
+    ? { top: 10, right: 20, left: 20, bottom: 70 }
+    : { top: 10, right: 30, left: 30, bottom: 60 };
 
   // Calculate min and max for domain
   const allValues = useMemo(() => data.flatMap(d => [d.high, d.low]), [data]);
@@ -181,7 +232,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       }}
     >
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={chartData} margin={margins}>
+        <ComposedChart data={volumeWithMA} margin={margins}>
           <defs>
             <clipPath id="candlestick-clip">
               <rect x="0" y="0" width="100%" height="100%" />
@@ -200,12 +251,24 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             tick={{ fill: '#666' }}
           />
           <YAxis
+            yAxisId="price"
             tickFormatter={formatYAxis}
             stroke="#666"
             fontSize={isSmallMobile ? 9 : isMobile ? 10 : 12}
             width={isSmallMobile ? 45 : isMobile ? 60 : 80}
             tick={{ fill: '#666' }}
             domain={[minValue - padding, maxValue + padding]}
+            orientation="left"
+          />
+          <YAxis
+            yAxisId="volume"
+            tickFormatter={formatVolumeAxis}
+            stroke="#666"
+            fontSize={isSmallMobile ? 8 : isMobile ? 9 : 10}
+            width={isSmallMobile ? 35 : isMobile ? 45 : 60}
+            tick={{ fill: '#666' }}
+            orientation="right"
+            domain={[0, volumeStats.max * 1.1]}
           />
           <Tooltip
             content={<CustomTooltip />}
@@ -217,6 +280,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
           />
           {/* High-Low range visualization */}
           <Line
+            yAxisId="price"
             type="monotone"
             dataKey="high"
             stroke="#10b981"
@@ -225,6 +289,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             activeDot={{ r: 4 }}
           />
           <Line
+            yAxisId="price"
             type="monotone"
             dataKey="low"
             stroke="#ef4444"
@@ -233,6 +298,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             activeDot={{ r: 4 }}
           />
           <Line
+            yAxisId="price"
             type="monotone"
             dataKey="close"
             stroke="#3b82f6"
@@ -240,6 +306,37 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             dot={false}
             activeDot={{ r: 5 }}
           />
+          {/* Volume bars with color coding */}
+          {volumeStats.max > 0 && (
+            <>
+              <Bar
+                yAxisId="volume"
+                dataKey="volume"
+                fill="#8884d8"
+                opacity={0.6}
+                radius={[2, 2, 0, 0]}
+              >
+                {volumeWithMA.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.isPositive ? '#10b981' : '#ef4444'}
+                    opacity={0.5}
+                  />
+                ))}
+              </Bar>
+              {/* Volume Moving Average Line */}
+              <Line
+                yAxisId="volume"
+                type="monotone"
+                dataKey="volumeMA"
+                stroke="#6366f1"
+                strokeWidth={1.5}
+                dot={false}
+                strokeDasharray="5 5"
+                opacity={0.7}
+              />
+            </>
+          )}
           {renderCandlesticks()}
         </ComposedChart>
       </ResponsiveContainer>

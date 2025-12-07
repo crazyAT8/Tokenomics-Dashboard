@@ -65,6 +65,7 @@ export const OHLCDataSchema = z.object({
   high: z.number().finite().nonnegative().default(0),
   low: z.number().finite().nonnegative().default(0),
   close: z.number().finite().nonnegative().default(0),
+  volume: z.number().finite().nonnegative().optional(),
 });
 
 // OHLCData array schema

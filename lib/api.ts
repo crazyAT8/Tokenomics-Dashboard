@@ -296,30 +296,69 @@ export const fetchOHLC = async (
         Math.abs(curr - days) < Math.abs(prev - days) ? curr : prev
       );
 
-      const params: any = {
-        vs_currency: sanitizedCurrency,
-        days: selectedDays,
-      };
-
-      const response = await api.get(`/coins/${sanitizedCoinId}/ohlc`, {
-        params,
-      });
+      // Fetch both OHLC and market chart data (for volume)
+      const [ohlcResponse, marketChartResponse] = await Promise.all([
+        api.get(`/coins/${sanitizedCoinId}/ohlc`, {
+          params: {
+            vs_currency: sanitizedCurrency,
+            days: selectedDays,
+          },
+        }),
+        api.get(`/coins/${sanitizedCoinId}/market_chart`, {
+          params: {
+            vs_currency: sanitizedCurrency,
+            days: selectedDays,
+            interval: selectedDays <= 1 ? 'hourly' : 'daily',
+          },
+        }),
+      ]);
       
-      // Validate raw API response
-      const validatedResponse = validateCoinGeckoOHLCResponse(response.data);
+      // Validate raw API responses
+      const validatedOHLC = validateCoinGeckoOHLCResponse(ohlcResponse.data);
+      const validatedMarketChart = validateCoinGeckoMarketChartResponse(marketChartResponse.data);
       
-      // Transform OHLC data: [timestamp, open, high, low, close]
-      const ohlcData = validatedResponse
+      // Create a map of volume data by timestamp for quick lookup
+      const volumeMap = new Map<number, number>();
+      if (validatedMarketChart.total_volumes) {
+        validatedMarketChart.total_volumes.forEach(([timestamp, volume]) => {
+          if (timestamp && volume && volume > 0) {
+            volumeMap.set(timestamp, volume);
+          }
+        });
+      }
+      
+      // Transform OHLC data and merge with volume: [timestamp, open, high, low, close]
+      const ohlcData = validatedOHLC
         .filter(([timestamp, open, high, low, close]) => 
           timestamp && open > 0 && high > 0 && low > 0 && close > 0
         )
-        .map(([timestamp, open, high, low, close]) => ({
-          timestamp,
-          open,
-          high,
-          low,
-          close,
-        }));
+        .map(([timestamp, open, high, low, close]) => {
+          // Find closest volume timestamp (within 1 hour tolerance)
+          let volume: number | undefined;
+          const exactVolume = volumeMap.get(timestamp);
+          if (exactVolume) {
+            volume = exactVolume;
+          } else {
+            // Find closest timestamp within 1 hour
+            const tolerance = 60 * 60 * 1000; // 1 hour in milliseconds
+            const volumeEntries = Array.from(volumeMap.entries());
+            for (const [volTimestamp, vol] of volumeEntries) {
+              if (Math.abs(volTimestamp - timestamp) <= tolerance) {
+                volume = vol;
+                break;
+              }
+            }
+          }
+          
+          return {
+            timestamp,
+            open,
+            high,
+            low,
+            close,
+            ...(volume !== undefined && { volume }),
+          };
+        });
       
       // Validate the final OHLC array
       return validateOHLCData(ohlcData);

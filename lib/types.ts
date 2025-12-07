@@ -50,6 +50,7 @@ export interface OHLCData {
   high: number;
   low: number;
   close: number;
+  volume?: number;
 }
 
 export type ChartType = 'line' | 'candlestick';
