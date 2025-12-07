@@ -11,6 +11,16 @@ import {
   ExchangeRateApiResponseSchema,
 } from './schemas';
 import { CoinData, PriceHistory, ExchangeRates, MarketData } from '../types';
+import {
+  applyCoinDataFallbacks,
+  applyTokenomicsDataFallbacks,
+  applyPriceHistoryFallbacks,
+  applyExchangeRatesFallbacks,
+  applyMarketDataFallbacks,
+  safeNumber,
+  safeNullableNumber,
+  safeString,
+} from './fallbacks';
 
 /**
  * Validation error class for better error handling
@@ -42,6 +52,28 @@ export function validate<T>(schema: z.ZodSchema<T>, data: unknown, errorMessage?
 }
 
 /**
+ * Validates data with fallback values applied for missing fields
+ */
+export function validateWithFallbacks<T>(
+  schema: z.ZodSchema<T>,
+  data: unknown,
+  applyFallbacksFn?: (data: any) => any,
+  errorMessage?: string
+): T {
+  try {
+    // Apply fallbacks if function provided
+    const dataWithFallbacks = applyFallbacksFn ? applyFallbacksFn(data) : data;
+    return schema.parse(dataWithFallbacks);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const message = errorMessage || `Validation failed: ${error.issues.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`).join(', ')}`;
+      throw new ValidationError(message, error, data);
+    }
+    throw error;
+  }
+}
+
+/**
  * Safely validates data and returns a result object
  */
 export function safeValidate<T>(
@@ -56,31 +88,57 @@ export function safeValidate<T>(
 }
 
 /**
- * Validates CoinData
+ * Validates CoinData with fallback values for missing fields
  */
 export function validateCoinData(data: unknown): CoinData {
-  return validate(CoinDataSchema, data, 'Invalid coin data structure');
+  // Normalize the data object first
+  const normalized = typeof data === 'object' && data !== null ? data as Partial<CoinData> : {};
+  
+  // Apply fallbacks for missing or null/undefined values
+  const dataWithFallbacks = applyCoinDataFallbacks(normalized);
+  
+  return validate(CoinDataSchema, dataWithFallbacks, 'Invalid coin data structure');
 }
 
 /**
- * Validates PriceHistory array
+ * Validates PriceHistory array with fallback values for missing fields
  */
 export function validatePriceHistory(data: unknown): PriceHistory[] {
-  return validate(PriceHistoryArraySchema, data, 'Invalid price history data structure');
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  
+  // Apply fallbacks to each price history entry
+  const dataWithFallbacks = data.map((item) => {
+    const normalized = typeof item === 'object' && item !== null ? item as Partial<PriceHistory> : {};
+    return applyPriceHistoryFallbacks(normalized);
+  });
+  
+  return validate(PriceHistoryArraySchema, dataWithFallbacks, 'Invalid price history data structure');
 }
 
 /**
- * Validates ExchangeRates
+ * Validates ExchangeRates with fallback values for missing fields
  */
 export function validateExchangeRates(data: unknown): ExchangeRates {
-  return validate(ExchangeRatesSchema, data, 'Invalid exchange rates data structure');
+  const normalized = typeof data === 'object' && data !== null ? data as Partial<ExchangeRates> : {};
+  
+  // Apply fallbacks for missing or null/undefined values
+  const dataWithFallbacks = applyExchangeRatesFallbacks(normalized);
+  
+  return validate(ExchangeRatesSchema, dataWithFallbacks, 'Invalid exchange rates data structure');
 }
 
 /**
- * Validates MarketData
+ * Validates MarketData with fallback values for missing fields
  */
 export function validateMarketData(data: unknown): MarketData {
-  return validate(MarketDataSchema, data, 'Invalid market data structure');
+  const normalized = typeof data === 'object' && data !== null ? data as Partial<MarketData> : {};
+  
+  // Apply fallbacks for missing or null/undefined values
+  const dataWithFallbacks = applyMarketDataFallbacks(normalized);
+  
+  return validate(MarketDataSchema, dataWithFallbacks, 'Invalid market data structure');
 }
 
 /**

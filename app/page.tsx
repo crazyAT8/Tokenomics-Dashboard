@@ -5,6 +5,7 @@ import { useDashboardStore } from '@/lib/store';
 import { useCoinData } from '@/hooks/useCoinData';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { useFavorites } from '@/hooks/useFavorites';
 import { Header } from '@/components/dashboard/Header';
 import { CoinSelector } from '@/components/dashboard/CoinSelector';
 import { TimeRangeSelector } from '@/components/dashboard/TimeRangeSelector';
@@ -13,6 +14,7 @@ import { CurrencyRates } from '@/components/dashboard/CurrencyRates';
 import { PriceChart } from '@/components/charts/PriceChart';
 import { TokenomicsOverview } from '@/components/dashboard/TokenomicsOverview';
 import { MetricCard } from '@/components/dashboard/MetricCard';
+import { Favorites } from '@/components/dashboard/Favorites';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { NetworkStatus } from '@/components/ui/NetworkStatus';
 import { 
@@ -22,7 +24,8 @@ import {
   BarChart3,
   Activity,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Star
 } from 'lucide-react';
 import { sanitizeUrl, escapeHtml } from '@/lib/utils/sanitize';
 
@@ -42,6 +45,7 @@ export default function Dashboard() {
   const { marketData, isLoading, error, errorDetails: hookErrorDetails, retryCount: hookRetryCount, refreshData } = useCoinData();
   const networkStatusHook = useNetworkStatus();
   const { exchangeRates, isLoading: ratesLoading, refreshRates } = useExchangeRates(currency);
+  const { toggleFavorite, isFavorite } = useFavorites();
 
   // Sync network status from hook to store
   useEffect(() => {
@@ -125,13 +129,45 @@ export default function Dashboard() {
       <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-6 lg:py-8">
         {/* Coin and Currency Selectors */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4 md:mb-6 lg:mb-8">
-          <CoinSelector
-            selectedCoin={selectedCoin}
-            onCoinSelect={setSelectedCoin}
-          />
+          <div className="flex gap-2 sm:gap-3">
+            <div className="flex-1">
+              <CoinSelector
+                selectedCoin={selectedCoin}
+                onCoinSelect={setSelectedCoin}
+              />
+            </div>
+            {marketData?.coin && (
+              <button
+                onClick={() => toggleFavorite(marketData.coin)}
+                className={`
+                  px-3 sm:px-4 py-2 rounded-md border transition-all
+                  min-h-[44px] sm:min-h-[40px] min-w-[44px] sm:min-w-[44px]
+                  touch-manipulation active:scale-[0.97] select-none
+                  flex items-center justify-center
+                  ${isFavorite(marketData.coin.id)
+                    ? 'bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100'
+                    : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                  }
+                `}
+                aria-label={isFavorite(marketData.coin.id) ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                <Star 
+                  className={`h-5 w-5 ${isFavorite(marketData.coin.id) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} 
+                />
+              </button>
+            )}
+          </div>
           <CurrencySelector
             selectedCurrency={currency}
             onCurrencySelect={setCurrency}
+          />
+        </div>
+
+        {/* Favorites */}
+        <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
+          <Favorites
+            selectedCoin={selectedCoin}
+            onCoinSelect={setSelectedCoin}
           />
         </div>
 

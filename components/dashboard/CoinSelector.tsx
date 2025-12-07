@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, Star } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { CoinData } from '@/lib/types';
 import { sanitizeSearchQuery, sanitizeUrl, escapeHtml } from '@/lib/utils/sanitize';
+import { useFavorites } from '@/hooks/useFavorites';
 
 interface CoinSelectorProps {
   selectedCoin: string;
@@ -20,10 +21,13 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [coins, setCoins] = useState<CoinData[]>([]);
+  const [favoriteCoins, setFavoriteCoins] = useState<CoinData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number>(0);
   const touchStartX = useRef<number>(0);
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
 
   const fetchCoins = async (query: string = '') => {
     setIsLoading(true);
@@ -49,11 +53,54 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
     }
   };
 
+  const fetchFavoriteCoins = async () => {
+    if (favorites.length === 0) {
+      setFavoriteCoins([]);
+      return;
+    }
+
+    setIsLoadingFavorites(true);
+    try {
+      // Fetch data for all favorite coins
+      const favoriteIds = favorites.map(fav => fav.id).join(',');
+      const response = await fetch(`/api/coins/search?ids=${encodeURIComponent(favoriteIds)}&limit=${favorites.length}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch favorite coins: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      // Sort favorites to maintain the order they were added
+      const sortedFavorites = favorites
+        .map(fav => data.find((coin: CoinData) => coin.id === fav.id))
+        .filter((coin): coin is CoinData => coin !== undefined);
+      
+      setFavoriteCoins(sortedFavorites);
+    } catch (error) {
+      console.error('Error fetching favorite coins:', error);
+      setFavoriteCoins([]);
+    } finally {
+      setIsLoadingFavorites(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
-      fetchCoins(searchQuery);
+      if (searchQuery.trim() === '') {
+        fetchFavoriteCoins();
+      } else {
+        fetchCoins(searchQuery);
+      }
     }
   }, [isOpen, searchQuery]);
+
+  // Fetch favorite coins when favorites change (only when dropdown is open and no search query)
+  useEffect(() => {
+    if (isOpen && searchQuery.trim() === '') {
+      fetchFavoriteCoins();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [favorites]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Sanitize search input
@@ -65,6 +112,11 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
     onCoinSelect(coinId);
     setIsOpen(false);
     setSearchQuery('');
+  };
+
+  const handleToggleFavorite = (e: React.MouseEvent, coin: CoinData) => {
+    e.stopPropagation();
+    toggleFavorite(coin);
   };
 
   // Handle swipe to close on mobile
@@ -166,37 +218,101 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
               ref={dropdownRef}
               className="max-h-[calc(100vh-280px)] sm:max-h-[calc(100vh-300px)] md:max-h-64 overflow-y-auto overscroll-contain scroll-smooth-touch"
             >
-              {isLoading ? (
-                <div className="p-4 text-center text-gray-500">
-                  Loading coins...
-                </div>
-              ) : coins.length === 0 ? (
-                <div className="p-4 text-center text-gray-500">
-                  No coins found
-                </div>
-              ) : (
-                coins.map((coin) => (
-                  <button
-                    key={coin.id}
-                    onClick={() => handleCoinSelect(coin.id)}
-                    className="w-full flex items-center p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[56px] touch-manipulation active:scale-[0.98] select-none"
-                  >
-                    <img
-                      src={sanitizeUrl(coin.image)}
-                      alt={escapeHtml(coin.name)}
-                      className="w-8 h-8 sm:w-8 sm:h-8 mr-3 rounded-full flex-shrink-0"
-                    />
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{escapeHtml(coin.name)}</p>
-                      <p className="text-xs sm:text-sm text-gray-500 uppercase">{escapeHtml(coin.symbol)}</p>
+              {searchQuery.trim() === '' ? (
+                // Show favorites when no search query
+                <>
+                  {favorites.length > 0 && (
+                    <div className="p-2 border-b border-gray-200">
+                      <p className="text-xs font-semibold text-gray-500 uppercase px-2">Favorites</p>
                     </div>
-                    {coin.market_cap_rank && (
-                      <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
-                        #{coin.market_cap_rank}
-                      </span>
-                    )}
-                  </button>
-                ))
+                  )}
+                  {isLoadingFavorites ? (
+                    <div className="p-4 text-center text-gray-500">
+                      Loading favorites...
+                    </div>
+                  ) : favoriteCoins.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">
+                      {favorites.length === 0 ? 'No favorites yet. Search for coins and star them to add to favorites.' : 'Loading favorites...'}
+                    </div>
+                  ) : (
+                    favoriteCoins.map((coin) => (
+                      <button
+                        key={coin.id}
+                        onClick={() => handleCoinSelect(coin.id)}
+                        className="w-full flex items-center p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[56px] touch-manipulation active:scale-[0.98] select-none"
+                      >
+                        <img
+                          src={sanitizeUrl(coin.image)}
+                          alt={escapeHtml(coin.name)}
+                          className="w-8 h-8 sm:w-8 sm:h-8 mr-3 rounded-full flex-shrink-0"
+                        />
+                        <div className="flex-1 text-left min-w-0">
+                          <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{escapeHtml(coin.name)}</p>
+                          <p className="text-xs sm:text-sm text-gray-500 uppercase">{escapeHtml(coin.symbol)}</p>
+                        </div>
+                        <button
+                          onClick={(e) => handleToggleFavorite(e, coin)}
+                          className="p-1.5 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0 ml-2 touch-manipulation"
+                          aria-label={isFavorite(coin.id) ? 'Remove from favorites' : 'Add to favorites'}
+                        >
+                          <Star 
+                            className={`h-4 w-4 ${isFavorite(coin.id) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} 
+                          />
+                        </button>
+                        {coin.market_cap_rank && (
+                          <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                            #{coin.market_cap_rank}
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </>
+              ) : (
+                // Show search results
+                <>
+                  {isLoading ? (
+                    <div className="p-4 text-center text-gray-500">
+                      Loading coins...
+                    </div>
+                  ) : coins.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">
+                      No coins found
+                    </div>
+                  ) : (
+                    coins.map((coin) => (
+                      <button
+                        key={coin.id}
+                        onClick={() => handleCoinSelect(coin.id)}
+                        className="w-full flex items-center p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[56px] touch-manipulation active:scale-[0.98] select-none"
+                      >
+                        <img
+                          src={sanitizeUrl(coin.image)}
+                          alt={escapeHtml(coin.name)}
+                          className="w-8 h-8 sm:w-8 sm:h-8 mr-3 rounded-full flex-shrink-0"
+                        />
+                        <div className="flex-1 text-left min-w-0">
+                          <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{escapeHtml(coin.name)}</p>
+                          <p className="text-xs sm:text-sm text-gray-500 uppercase">{escapeHtml(coin.symbol)}</p>
+                        </div>
+                        <button
+                          onClick={(e) => handleToggleFavorite(e, coin)}
+                          className="p-1.5 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0 ml-2 touch-manipulation"
+                          aria-label={isFavorite(coin.id) ? 'Remove from favorites' : 'Add to favorites'}
+                        >
+                          <Star 
+                            className={`h-4 w-4 ${isFavorite(coin.id) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} 
+                          />
+                        </button>
+                        {coin.market_cap_rank && (
+                          <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                            #{coin.market_cap_rank}
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </>
               )}
             </div>
           </Card>

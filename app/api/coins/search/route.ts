@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { searchCoins, fetchTopCoins } from '@/lib/api';
-import { sanitizeSearchQuery, sanitizeNumber } from '@/lib/utils/sanitize';
+import { searchCoins, fetchTopCoins, fetchCoinsByIds } from '@/lib/api';
+import { sanitizeSearchQuery, sanitizeNumber, sanitizeCoinId } from '@/lib/utils/sanitize';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    
+    // Check for IDs parameter (comma-separated list of coin IDs)
+    const idsParam = searchParams.get('ids');
+    
+    if (idsParam) {
+      // Fetch coins by IDs
+      const ids = idsParam.split(',').map(id => sanitizeCoinId(id.trim())).filter(Boolean) as string[];
+      if (ids.length > 0) {
+        const coins = await fetchCoinsByIds(ids);
+        console.log('Search API - returning coins by IDs:', coins.length);
+        return NextResponse.json(coins);
+      }
+    }
     
     // Sanitize search query
     const query = sanitizeSearchQuery(searchParams.get('q'));

@@ -13,24 +13,24 @@ const sanitizedUrl = () =>
     message: 'Invalid URL format',
   });
 
-// CoinData validation schema
+// CoinData validation schema with fallback defaults
 export const CoinDataSchema = z.object({
   id: z.string().transform((val) => sanitizeCoinId(val)).refine((val) => val.length > 0, {
     message: 'Coin ID is required',
   }),
   symbol: sanitizedString(1),
   name: sanitizedString(1),
-  image: z.string().transform((val) => {
+  image: z.string().default('').transform((val) => {
     const sanitized = sanitizeUrl(val);
     return sanitized || ''; // Allow empty string for image
   }).refine((val) => val.length === 0 || val.startsWith('http'), {
     message: 'Invalid image URL',
   }),
-  current_price: z.number().finite(),
-  market_cap: z.number().finite().nonnegative(),
-  market_cap_rank: z.number().int().nonnegative(),
+  current_price: z.number().finite().default(0),
+  market_cap: z.number().finite().nonnegative().default(0),
+  market_cap_rank: z.number().int().nonnegative().default(0),
   fully_diluted_valuation: z.number().finite().nonnegative().nullable(),
-  total_volume: z.number().finite().nonnegative(),
+  total_volume: z.number().finite().nonnegative().default(0),
   high_24h: z.number().finite().nonnegative().nullable(),
   low_24h: z.number().finite().nonnegative().nullable(),
   price_change_24h: z.number().finite().nullable(),
@@ -42,34 +42,34 @@ export const CoinDataSchema = z.object({
   max_supply: z.number().finite().nonnegative().nullable(),
   ath: z.number().finite().nonnegative().nullable(),
   ath_change_percentage: z.number().finite().nullable(),
-  ath_date: sanitizedString(0),
+  ath_date: z.string().default('').transform((val) => sanitizeString(val, { maxLength: 1000 })),
   atl: z.number().finite().nonnegative().nullable(),
   atl_change_percentage: z.number().finite().nullable(),
-  atl_date: sanitizedString(0),
-  last_updated: sanitizedString(0),
+  atl_date: z.string().default('').transform((val) => sanitizeString(val, { maxLength: 1000 })),
+  last_updated: z.string().default(() => new Date().toISOString()).transform((val) => sanitizeString(val, { maxLength: 1000 })),
 });
 
-// PriceHistory validation schema
+// PriceHistory validation schema with fallback defaults
 export const PriceHistorySchema = z.object({
-  timestamp: z.number().int().positive(),
-  price: z.number().finite().positive(),
+  timestamp: z.number().int().nonnegative().default(() => Date.now()),
+  price: z.number().finite().nonnegative().default(0), // Allow 0 as fallback, will be validated separately
 });
 
 // PriceHistory array schema
 export const PriceHistoryArraySchema = z.array(PriceHistorySchema).min(0);
 
-// TokenomicsData validation schema
+// TokenomicsData validation schema with fallback defaults
 export const TokenomicsDataSchema = z.object({
   circulating_supply: z.number().finite().nonnegative().nullable(),
   total_supply: z.number().finite().nonnegative().nullable(),
   max_supply: z.number().finite().nonnegative().nullable(),
-  market_cap: z.number().finite().nonnegative(),
+  market_cap: z.number().finite().nonnegative().default(0),
   fully_diluted_valuation: z.number().finite().nonnegative().nullable(),
-  price: z.number().finite().positive(),
+  price: z.number().finite().nonnegative().default(0), // Allow 0 as fallback, will be validated separately
   price_change_24h: z.number().finite().nullable(),
   price_change_percentage_24h: z.number().finite().nullable(),
-  volume_24h: z.number().finite().nonnegative(),
-  market_cap_rank: z.number().int().nonnegative(),
+  volume_24h: z.number().finite().nonnegative().default(0),
+  market_cap_rank: z.number().int().nonnegative().default(0),
 });
 
 // MarketData validation schema
@@ -79,16 +79,16 @@ export const MarketDataSchema = z.object({
   tokenomics: TokenomicsDataSchema,
 });
 
-// ExchangeRates validation schema
+// ExchangeRates validation schema with fallback defaults
 export const ExchangeRatesSchema = z.object({
-  base: z.string().transform((val) => sanitizeString(val, { maxLength: 10 }).toLowerCase()).refine((val) => val.length > 0, {
+  base: z.string().default('usd').transform((val) => sanitizeString(val, { maxLength: 10 }).toLowerCase()).refine((val) => val.length > 0, {
     message: 'Base currency is required',
   }),
   rates: z.record(
     z.string().transform((val) => sanitizeString(val, { maxLength: 10 }).toUpperCase()),
     z.number().finite().positive()
-  ),
-  timestamp: z.number().int().positive(),
+  ).default({}),
+  timestamp: z.number().int().positive().default(() => Date.now()),
 });
 
 // CoinGecko API response schemas (for raw API responses)

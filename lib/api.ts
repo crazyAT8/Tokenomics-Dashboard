@@ -346,6 +346,96 @@ export const fetchTopCoins = async (limit: number = 10): Promise<CoinData[]> => 
   }
 };
 
+export const fetchCoinsByIds = async (ids: string[]): Promise<CoinData[]> => {
+  try {
+    if (!ids || ids.length === 0) {
+      return [];
+    }
+
+    // Sanitize coin IDs
+    const sanitizedIds = ids.map(id => sanitizeCoinId(id)).filter(Boolean) as string[];
+    
+    if (sanitizedIds.length === 0) {
+      return [];
+    }
+
+    return await retry(async () => {
+      const response = await api.get('/coins/markets', {
+        params: {
+          vs_currency: 'usd',
+          ids: sanitizedIds.join(','),
+          order: 'market_cap_desc',
+          per_page: sanitizedIds.length,
+          page: 1,
+          sparkline: false,
+          price_change_percentage: '24h',
+        },
+      });
+      
+      // Validate raw API response
+      const validatedResponse = validateCoinGeckoMarketResponse(response.data);
+      
+      // Transform and validate each coin
+      const coins = validatedResponse.map((marketData) => {
+        const coinData: CoinData = {
+          id: marketData.id,
+          symbol: marketData.symbol,
+          name: marketData.name,
+          image: marketData.image || '',
+          current_price: marketData.current_price ?? 0,
+          market_cap: marketData.market_cap ?? 0,
+          market_cap_rank: marketData.market_cap_rank ?? 0,
+          fully_diluted_valuation: marketData.fully_diluted_valuation ?? null,
+          total_volume: marketData.total_volume ?? 0,
+          high_24h: marketData.high_24h ?? null,
+          low_24h: marketData.low_24h ?? null,
+          price_change_24h: marketData.price_change_24h ?? null,
+          price_change_percentage_24h: marketData.price_change_percentage_24h ?? null,
+          market_cap_change_24h: marketData.market_cap_change_24h ?? null,
+          market_cap_change_percentage_24h: marketData.market_cap_change_percentage_24h ?? null,
+          circulating_supply: marketData.circulating_supply ?? null,
+          total_supply: marketData.total_supply ?? null,
+          max_supply: marketData.max_supply ?? null,
+          ath: marketData.ath ?? null,
+          ath_change_percentage: marketData.ath_change_percentage ?? null,
+          ath_date: marketData.ath_date ?? '',
+          atl: marketData.atl ?? null,
+          atl_change_percentage: marketData.atl_change_percentage ?? null,
+          atl_date: marketData.atl_date ?? '',
+          last_updated: marketData.last_updated ?? new Date().toISOString(),
+        };
+        
+        return validateCoinData(coinData);
+      });
+      
+      return coins;
+    }, {
+      maxRetries: 3,
+      initialDelay: 1000,
+    });
+  } catch (error: any) {
+    console.error('Error fetching coins by IDs:', error);
+    
+    // Handle validation errors
+    if (error instanceof ValidationError) {
+      const validationError = new Error(`Data validation failed: ${error.message}`);
+      (validationError as any).parsedError = {
+        message: error.message,
+        statusCode: 500,
+        retryable: false,
+        type: 'validation_error',
+      };
+      throw validationError;
+    }
+    
+    const parsedError = error.parsedError || parseError(error);
+    const message = getUserFriendlyErrorMessage(parsedError);
+    const enhancedError = new Error(message);
+    (enhancedError as any).parsedError = parsedError;
+    throw enhancedError;
+  }
+};
+
 export const searchCoins = async (query: string): Promise<CoinData[]> => {
   try {
     // Sanitize search query
