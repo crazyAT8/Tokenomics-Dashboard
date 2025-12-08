@@ -19,6 +19,8 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 
 interface PortfolioManagerProps {
@@ -35,6 +37,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
     addCoin,
     removeCoin,
     updateQuantity,
+    updatePurchasePrice,
     isInPortfolio,
   } = usePortfolio();
 
@@ -45,7 +48,9 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [editingCoinId, setEditingCoinId] = useState<string | null>(null);
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
+  const [purchasePriceInputs, setPurchasePriceInputs] = useState<Record<string, string>>({});
   const [addQuantityInputs, setAddQuantityInputs] = useState<Record<string, string>>({});
+  const [addPurchasePriceInputs, setAddPurchasePriceInputs] = useState<Record<string, string>>({});
   const [portfolioCoinsData, setPortfolioCoinsData] = useState<CoinData[]>([]);
   const [isLoadingPortfolioData, setIsLoadingPortfolioData] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -113,12 +118,14 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
     }
   };
 
-  const handleAddCoin = (coin: CoinData, quantity: number) => {
+  const handleAddCoin = (coin: CoinData, quantity: number, purchasePrice?: number) => {
     if (quantity > 0) {
-      addCoin(coin, quantity);
+      addCoin(coin, quantity, purchasePrice);
       setShowAddForm(false);
       setSearchQuery('');
       setSearchResults([]);
+      setAddQuantityInputs({});
+      setAddPurchasePriceInputs({});
     }
   };
 
@@ -126,38 +133,65 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
     removeCoin(coinId);
   };
 
-  const handleStartEdit = (coinId: string, currentQuantity: number) => {
+  const handleStartEdit = (coinId: string, currentQuantity: number, currentPurchasePrice?: number) => {
     setEditingCoinId(coinId);
     setQuantityInputs({ ...quantityInputs, [coinId]: currentQuantity.toString() });
+    setPurchasePriceInputs({ ...purchasePriceInputs, [coinId]: currentPurchasePrice?.toString() || '' });
   };
 
   const handleSaveEdit = (coinId: string) => {
     const quantityStr = quantityInputs[coinId];
+    const purchasePriceStr = purchasePriceInputs[coinId];
     const quantity = parseFloat(quantityStr || '0');
+    const purchasePrice = purchasePriceStr ? parseFloat(purchasePriceStr) : undefined;
     
     if (quantity > 0) {
       updateQuantity(coinId, quantity);
+      updatePurchasePrice(coinId, purchasePrice);
     } else {
       removeCoin(coinId);
     }
     
     setEditingCoinId(null);
     setQuantityInputs({});
+    setPurchasePriceInputs({});
   };
 
   const handleCancelEdit = () => {
     setEditingCoinId(null);
     setQuantityInputs({});
+    setPurchasePriceInputs({});
   };
 
-  // Calculate total portfolio value
-  const totalValue = portfolio.reduce((sum, entry) => {
+  // Calculate total portfolio value and P&L
+  const portfolioCalculations = portfolio.reduce((acc, entry) => {
     const coinData = portfolioCoinsData.find((coin) => coin.id === entry.coinId);
     if (coinData) {
-      return sum + coinData.current_price * entry.quantity;
+      const currentValue = coinData.current_price * entry.quantity;
+      const costBasis = entry.purchasePrice ? entry.purchasePrice * entry.quantity : 0;
+      const profitLoss = entry.purchasePrice ? currentValue - costBasis : null;
+      const profitLossPercent = entry.purchasePrice && costBasis > 0 
+        ? ((currentValue - costBasis) / costBasis) * 100 
+        : null;
+      
+      acc.totalValue += currentValue;
+      acc.totalCostBasis += costBasis;
+      if (profitLoss !== null) {
+        acc.totalProfitLoss += profitLoss;
+      }
     }
-    return sum;
-  }, 0);
+    return acc;
+  }, {
+    totalValue: 0,
+    totalCostBasis: 0,
+    totalProfitLoss: 0,
+  });
+
+  const totalValue = portfolioCalculations.totalValue;
+  const totalProfitLoss = portfolioCalculations.totalProfitLoss;
+  const totalProfitLossPercent = portfolioCalculations.totalCostBasis > 0
+    ? (totalProfitLoss / portfolioCalculations.totalCostBasis) * 100
+    : null;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -208,8 +242,8 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
         <div className="border-t border-gray-200 p-3 sm:p-4 space-y-4">
           {/* Portfolio Summary */}
           {portfolio.length > 0 && (
-            <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-gray-50 rounded-lg p-3 sm:p-4 space-y-2">
+              <div className="flex items-center justify-between">
                 <span className="text-xs sm:text-sm font-medium text-gray-600">
                   Total Portfolio Value
                 </span>
@@ -217,7 +251,41 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                   {formatCurrency(totalValue, currency)}
                 </span>
               </div>
-              <div className="text-xs text-gray-500">
+              {portfolioCalculations.totalCostBasis > 0 && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm font-medium text-gray-600">
+                      Total Cost Basis
+                    </span>
+                    <span className="text-sm font-medium text-gray-700">
+                      {formatCurrency(portfolioCalculations.totalCostBasis, currency)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                    <span className="text-xs sm:text-sm font-medium text-gray-600">
+                      Total P&L
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {totalProfitLoss >= 0 ? (
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-red-600" />
+                      )}
+                      <span className={`text-sm sm:text-base font-bold ${
+                        totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {formatCurrency(Math.abs(totalProfitLoss), currency)}
+                        {totalProfitLossPercent !== null && (
+                          <span className="ml-1 text-xs">
+                            ({totalProfitLossPercent >= 0 ? '+' : ''}{totalProfitLossPercent.toFixed(2)}%)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
+              <div className="text-xs text-gray-500 pt-1">
                 {portfolio.length} {portfolio.length === 1 ? 'coin' : 'coins'} in portfolio
               </div>
             </div>
@@ -253,6 +321,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                           setSearchQuery('');
                           setSearchResults([]);
                           setAddQuantityInputs({});
+                          setAddPurchasePriceInputs({});
                         }}
                         className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
                       >
@@ -267,6 +336,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                       setSearchQuery('');
                       setSearchResults([]);
                       setAddQuantityInputs({});
+                      setAddPurchasePriceInputs({});
                     }}
                   >
                     <X className="h-4 w-4" />
@@ -317,33 +387,53 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    placeholder="Quantity"
+                                    value={quantity}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val === '' || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0)) {
+                                        setAddQuantityInputs({ ...addQuantityInputs, [coin.id]: val });
+                                      }
+                                    }}
+                                    min="0"
+                                    step="0.00000001"
+                                    className="flex-1 min-h-[36px] text-sm"
+                                  />
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={() => {
+                                      const purchasePrice = addPurchasePriceInputs[coin.id] 
+                                        ? parseFloat(addPurchasePriceInputs[coin.id]) 
+                                        : undefined;
+                                      handleAddCoin(coin, parseFloat(quantity) || 0, purchasePrice);
+                                      setAddQuantityInputs({ ...addQuantityInputs, [coin.id]: '1' });
+                                      setAddPurchasePriceInputs({ ...addPurchasePriceInputs, [coin.id]: '' });
+                                    }}
+                                    disabled={!quantity || parseFloat(quantity) <= 0}
+                                    className="min-h-[36px]"
+                                  >
+                                    {inPortfolio ? 'Add More' : 'Add'}
+                                  </Button>
+                                </div>
                                 <Input
                                   type="number"
-                                  placeholder="Quantity"
-                                  value={quantity}
+                                  placeholder={`Purchase Price (${currency.toUpperCase()}) - Optional`}
+                                  value={addPurchasePriceInputs[coin.id] || ''}
                                   onChange={(e) => {
                                     const val = e.target.value;
                                     if (val === '' || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0)) {
-                                      setAddQuantityInputs({ ...addQuantityInputs, [coin.id]: val });
+                                      setAddPurchasePriceInputs({ ...addPurchasePriceInputs, [coin.id]: val });
                                     }
                                   }}
                                   min="0"
-                                  step="0.00000001"
-                                  className="flex-1 min-h-[36px] text-sm"
+                                  step="0.01"
+                                  className="w-full min-h-[36px] text-sm"
                                 />
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  onClick={() => {
-                                    handleAddCoin(coin, parseFloat(quantity) || 0);
-                                    setAddQuantityInputs({ ...addQuantityInputs, [coin.id]: '1' });
-                                  }}
-                                  disabled={!quantity || parseFloat(quantity) <= 0}
-                                  className="min-h-[36px]"
-                                >
-                                  {inPortfolio ? 'Add More' : 'Add'}
-                                </Button>
                               </div>
                             </div>
                           );
@@ -372,8 +462,14 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                 {portfolio.map((entry) => {
                   const coinData = portfolioCoinsData.find((coin) => coin.id === entry.coinId);
                   const currentValue = coinData ? coinData.current_price * entry.quantity : 0;
+                  const costBasis = entry.purchasePrice ? entry.purchasePrice * entry.quantity : 0;
+                  const profitLoss = entry.purchasePrice && coinData ? currentValue - costBasis : null;
+                  const profitLossPercent = entry.purchasePrice && costBasis > 0 && coinData
+                    ? ((currentValue - costBasis) / costBasis) * 100
+                    : null;
                   const isEditing = editingCoinId === entry.coinId;
                   const quantityValue = quantityInputs[entry.coinId] ?? entry.quantity.toString();
+                  const purchasePriceValue = purchasePriceInputs[entry.coinId] ?? (entry.purchasePrice?.toString() || '');
 
                   return (
                     <div
@@ -447,7 +543,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                                 })}
                               </span>
                               <button
-                                onClick={() => handleStartEdit(entry.coinId, entry.quantity)}
+                                onClick={() => handleStartEdit(entry.coinId, entry.quantity, entry.purchasePrice)}
                                 className="p-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
                                 aria-label="Edit quantity"
                               >
@@ -456,6 +552,37 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                             </div>
                           )}
                         </div>
+
+                        {isEditing && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600">Purchase Price:</span>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                placeholder="Optional"
+                                value={purchasePriceValue}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '' || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0)) {
+                                    setPurchasePriceInputs({ ...purchasePriceInputs, [entry.coinId]: val });
+                                  }
+                                }}
+                                min="0"
+                                step="0.01"
+                                className="w-24 min-h-[32px] text-xs"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {!isEditing && entry.purchasePrice && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600">Purchase Price:</span>
+                            <span className="font-medium text-gray-900">
+                              {formatCurrency(entry.purchasePrice, currency)}
+                            </span>
+                          </div>
+                        )}
 
                         {coinData && (
                           <>
@@ -471,6 +598,28 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                                 {formatCurrency(currentValue, currency)}
                               </span>
                             </div>
+                            {profitLoss !== null && (
+                              <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-200">
+                                <span className="text-gray-600">P&L:</span>
+                                <div className="flex items-center gap-1">
+                                  {profitLoss >= 0 ? (
+                                    <TrendingUp className="h-3 w-3 text-green-600" />
+                                  ) : (
+                                    <TrendingDown className="h-3 w-3 text-red-600" />
+                                  )}
+                                  <span className={`font-semibold ${
+                                    profitLoss >= 0 ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {formatCurrency(Math.abs(profitLoss), currency)}
+                                    {profitLossPercent !== null && (
+                                      <span className="ml-1">
+                                        ({profitLossPercent >= 0 ? '+' : ''}{profitLossPercent.toFixed(2)}%)
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                             {onCoinSelect && (
                               <Button
                                 variant="ghost"

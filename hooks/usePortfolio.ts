@@ -51,11 +51,25 @@ export function usePortfolio() {
       if (existingIndex >= 0) {
         // Update existing entry - add to quantity
         const updated = [...prev];
+        const existingEntry = updated[existingIndex];
+        const newQuantity = existingEntry.quantity + quantity;
+        
+        // Calculate weighted average purchase price if both have prices
+        let newPurchasePrice: number | undefined;
+        if (existingEntry.purchasePrice && purchasePrice) {
+          // Weighted average: (old_price * old_quantity + new_price * new_quantity) / total_quantity
+          const oldCostBasis = existingEntry.purchasePrice * existingEntry.quantity;
+          const newCostBasis = purchasePrice * quantity;
+          newPurchasePrice = (oldCostBasis + newCostBasis) / newQuantity;
+        } else {
+          // Use whichever price is available
+          newPurchasePrice = purchasePrice || existingEntry.purchasePrice;
+        }
+        
         updated[existingIndex] = {
-          ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + quantity,
-          // Update purchase price if provided (weighted average could be calculated here)
-          purchasePrice: purchasePrice || updated[existingIndex].purchasePrice,
+          ...existingEntry,
+          quantity: newQuantity,
+          purchasePrice: newPurchasePrice,
         };
         return updated;
       }
