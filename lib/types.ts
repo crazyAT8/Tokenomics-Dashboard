@@ -110,3 +110,14 @@ export interface ChartCustomizationSettings {
   // Animation
   enableAnimation: boolean;
 }
+
+export interface PortfolioEntry {
+  id: string;
+  coinId: string;
+  name: string;
+  symbol: string;
+  image: string;
+  quantity: number;
+  purchasePrice?: number; // Optional purchase price for future profit/loss calculations
+  addedAt: number;
+}

@@ -21,6 +21,7 @@ import { TokenomicsOverview } from '@/components/dashboard/TokenomicsOverview';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Favorites } from '@/components/dashboard/Favorites';
 import { PortfolioOverview } from '@/components/dashboard/PortfolioOverview';
+import { PortfolioManager } from '@/components/dashboard/PortfolioManager';
 import { CoinData } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { NetworkStatus } from '@/components/ui/NetworkStatus';
@@ -242,6 +243,14 @@ export default function Dashboard() {
         <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8 sticky top-4 z-30">
           <Favorites
             selectedCoin={selectedCoin}
+            onCoinSelect={setSelectedCoin}
+          />
+        </div>
+
+        {/* Portfolio Manager */}
+        <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
+          <PortfolioManager
+            currency={currency}
             onCoinSelect={setSelectedCoin}
           />
         </div>
