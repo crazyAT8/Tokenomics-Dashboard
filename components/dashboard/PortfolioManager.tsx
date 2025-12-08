@@ -22,6 +22,7 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
+import { PortfolioPerformanceMetrics } from '@/components/dashboard/PortfolioPerformanceMetrics';
 
 interface PortfolioManagerProps {
   currency: Currency;
@@ -240,6 +241,15 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
 
       {isExpanded && (
         <div className="border-t border-gray-200 p-3 sm:p-4 space-y-4">
+          {/* Portfolio Performance Metrics */}
+          {portfolio.length > 0 && portfolioCoinsData.length > 0 && (
+            <PortfolioPerformanceMetrics
+              portfolio={portfolio}
+              portfolioCoinsData={portfolioCoinsData}
+              currency={currency}
+            />
+          )}
+
           {/* Portfolio Summary */}
           {portfolio.length > 0 && (
             <div className="bg-gray-50 rounded-lg p-3 sm:p-4 space-y-2">
