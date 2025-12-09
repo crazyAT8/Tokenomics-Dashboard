@@ -121,3 +121,32 @@ export interface PortfolioEntry {
   purchasePrice?: number; // Optional purchase price for future profit/loss calculations
   addedAt: number;
 }
+
+export type PortfolioTransactionType = 'buy' | 'sell';
+
+export interface PortfolioTransaction {
+  id: string;
+  coinId: string;
+  type: PortfolioTransactionType;
+  quantity: number;
+  price: number;
+  fee?: number;
+  timestamp: number;
+  note?: string;
+}
+
+export type PortfolioContributionType = 'contribution' | 'withdrawal';
+
+export interface PortfolioContribution {
+  id: string;
+  type: PortfolioContributionType;
+  amount: number;
+  timestamp: number;
+  note?: string;
+}
+
+export interface PortfolioState {
+  entries: PortfolioEntry[];
+  transactions: PortfolioTransaction[];
+  contributions: PortfolioContribution[];
+}

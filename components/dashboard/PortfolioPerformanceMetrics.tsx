@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { PortfolioEntry } from '@/lib/types';
+import { PortfolioEntry, PortfolioTransaction, PortfolioContribution } from '@/lib/types';
 import { CoinData } from '@/lib/types';
 import { Currency } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils/currency';
@@ -23,6 +23,8 @@ import {
 interface PortfolioPerformanceMetricsProps {
   portfolio: PortfolioEntry[];
   portfolioCoinsData: CoinData[];
+  transactions?: PortfolioTransaction[];
+  contributions?: PortfolioContribution[];
   currency: Currency;
 }
 
@@ -30,6 +32,9 @@ interface PerformanceMetrics {
   totalValue: number;
   totalCostBasis: number;
   totalProfitLoss: number;
+  totalRealized: number;
+  totalUnrealized: number;
+  netContributions: number;
   totalProfitLossPercent: number | null;
   profitablePositions: number;
   unprofitablePositions: number;
@@ -61,39 +66,78 @@ interface PerformanceMetrics {
     profitLoss: number;
     profitLossPercent: number | null;
     allocationPercent: number;
+    realizedPnl: number;
+    unrealizedPnl: number;
+    averageCost?: number;
   }>;
 }
 
 function calculatePerformanceMetrics(
   portfolio: PortfolioEntry[],
-  portfolioCoinsData: CoinData[]
+  portfolioCoinsData: CoinData[],
+  transactions: PortfolioTransaction[] = [],
+  contributions: PortfolioContribution[] = []
 ): PerformanceMetrics {
+  const calculatePosition = (coinId: string) => {
+    let quantity = 0;
+    let costBasis = 0;
+    let realizedPnl = 0;
+    const coinTransactions = transactions.filter((tx) => tx.coinId === coinId).sort((a, b) => a.timestamp - b.timestamp);
+
+    coinTransactions.forEach((tx) => {
+      const fee = tx.fee ?? 0;
+      if (tx.type === 'buy') {
+        costBasis += tx.price * tx.quantity + fee;
+        quantity += tx.quantity;
+      } else {
+        const sellQty = Math.min(tx.quantity, quantity);
+        if (sellQty <= 0 || quantity <= 0) return;
+        const avgCost = quantity > 0 ? costBasis / quantity : 0;
+        const proceeds = tx.price * sellQty - fee;
+        realizedPnl += proceeds - avgCost * sellQty;
+        costBasis -= avgCost * sellQty;
+        quantity -= sellQty;
+      }
+    });
+
+    return {
+      quantity,
+      costBasis: costBasis < 0.00000001 ? 0 : costBasis,
+      realizedPnl,
+      averageCost: quantity > 0 ? costBasis / quantity : undefined,
+    };
+  };
+
   const positions = portfolio
     .map((entry) => {
       const coinData = portfolioCoinsData.find((coin) => coin.id === entry.coinId);
       if (!coinData) return null;
 
-      const currentValue = coinData.current_price * entry.quantity;
-      const costBasis = entry.purchasePrice ? entry.purchasePrice * entry.quantity : 0;
-      const profitLoss = entry.purchasePrice ? currentValue - costBasis : 0;
-      const profitLossPercent =
-        entry.purchasePrice && costBasis > 0 ? ((currentValue - costBasis) / costBasis) * 100 : null;
+      const stats = calculatePosition(entry.coinId);
+      const currentValue = coinData.current_price * stats.quantity;
+      const profitLoss = currentValue - stats.costBasis;
+      const profitLossPercent = stats.costBasis > 0 ? (profitLoss / stats.costBasis) * 100 : null;
 
       return {
         entry,
         coinData,
         currentValue,
-        costBasis,
+        costBasis: stats.costBasis,
         profitLoss,
         profitLossPercent,
-        allocationPercent: 0, // Will be calculated after total value is known
+        allocationPercent: 0, // calculated later
+        realizedPnl: stats.realizedPnl,
+        unrealizedPnl: profitLoss,
+        averageCost: stats.averageCost,
       };
     })
     .filter((pos): pos is NonNullable<typeof pos> => pos !== null);
 
   const totalValue = positions.reduce((sum, pos) => sum + pos.currentValue, 0);
   const totalCostBasis = positions.reduce((sum, pos) => sum + pos.costBasis, 0);
-  const totalProfitLoss = positions.reduce((sum, pos) => sum + pos.profitLoss, 0);
+  const totalRealized = positions.reduce((sum, pos) => sum + pos.realizedPnl, 0);
+  const totalUnrealized = positions.reduce((sum, pos) => sum + pos.unrealizedPnl, 0);
+  const totalProfitLoss = totalRealized + totalUnrealized;
   const totalProfitLossPercent =
     totalCostBasis > 0 ? (totalProfitLoss / totalCostBasis) * 100 : null;
 
@@ -153,10 +197,18 @@ function calculatePerformanceMetrics(
         })()
       : null;
 
+  const netContributions = contributions.reduce(
+    (acc, c) => acc + (c.type === 'contribution' ? c.amount : -c.amount),
+    0
+  );
+
   return {
     totalValue,
     totalCostBasis,
     totalProfitLoss,
+    totalRealized,
+    totalUnrealized,
+    netContributions,
     totalProfitLossPercent,
     profitablePositions,
     unprofitablePositions,
@@ -186,13 +238,15 @@ function calculatePerformanceMetrics(
 export const PortfolioPerformanceMetrics: React.FC<PortfolioPerformanceMetricsProps> = ({
   portfolio,
   portfolioCoinsData,
+  transactions = [],
+  contributions = [],
   currency,
 }) => {
   if (portfolio.length === 0 || portfolioCoinsData.length === 0) {
     return null;
   }
 
-  const metrics = calculatePerformanceMetrics(portfolio, portfolioCoinsData);
+  const metrics = calculatePerformanceMetrics(portfolio, portfolioCoinsData, transactions, contributions);
 
   return (
     <Card className="overflow-hidden">
@@ -248,6 +302,34 @@ export const PortfolioPerformanceMetrics: React.FC<PortfolioPerformanceMetricsPr
               />
             </>
           )}
+
+          <MetricCard
+            title="Realized P&L"
+            value={metrics.totalRealized}
+            changeType={
+              metrics.totalRealized > 0 ? 'positive' : metrics.totalRealized < 0 ? 'negative' : 'neutral'
+            }
+            icon={metrics.totalRealized >= 0 ? <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" /> : <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5" />}
+            currency={currency}
+          />
+
+          <MetricCard
+            title="Unrealized P&L"
+            value={metrics.totalUnrealized}
+            changeType={
+              metrics.totalUnrealized > 0 ? 'positive' : metrics.totalUnrealized < 0 ? 'negative' : 'neutral'
+            }
+            icon={metrics.totalUnrealized >= 0 ? <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" /> : <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5" />}
+            currency={currency}
+          />
+
+          <MetricCard
+            title="Net Contributions"
+            value={metrics.netContributions}
+            changeType={metrics.netContributions >= 0 ? 'neutral' : 'negative'}
+            icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />}
+            currency={currency}
+          />
 
           {metrics.averageROI !== null && (
             <MetricCard
