@@ -152,3 +152,24 @@ export interface PortfolioState {
   transactions: PortfolioTransaction[];
   contributions: PortfolioContribution[];
 }
+
+export type PriceAlertType = 'above' | 'below';
+
+export interface PriceAlert {
+  id: string;
+  coinId: string;
+  coinName: string;
+  coinSymbol: string;
+  coinImage: string;
+  targetPrice: number;
+  type: PriceAlertType; // 'above' means alert when price goes above target, 'below' means alert when price goes below target
+  currency: 'usd' | 'eur' | 'gbp' | 'jpy' | 'cad' | 'aud' | 'chf' | 'cny' | 'inr' | 'krw';
+  isActive: boolean;
+  createdAt: number;
+  triggeredAt?: number;
+  note?: string;
+  // Notification preferences
+  emailNotification?: boolean;
+  emailAddress?: string;
+  browserNotification?: boolean;
+}

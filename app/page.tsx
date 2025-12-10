@@ -22,7 +22,9 @@ import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Favorites } from '@/components/dashboard/Favorites';
 import { PortfolioOverview } from '@/components/dashboard/PortfolioOverview';
 import { PortfolioManager } from '@/components/dashboard/PortfolioManager';
+import { PriceAlerts } from '@/components/dashboard/PriceAlerts';
 import { CoinData } from '@/lib/types';
+import { usePriceAlertMonitor } from '@/hooks/usePriceAlertMonitor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { NetworkStatus } from '@/components/ui/NetworkStatus';
 import { 
@@ -65,6 +67,9 @@ export default function Dashboard() {
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
   const [favoriteCoins, setFavoriteCoins] = useState<CoinData[]>([]);
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
+  
+  // Monitor price alerts and trigger notifications
+  usePriceAlertMonitor();
 
   // Sync network status from hook to store
   useEffect(() => {
@@ -426,6 +431,13 @@ export default function Dashboard() {
             </div>
           </>
         ) : null}
+
+        {/* Price Alerts */}
+        {marketData && (
+          <div className="mb-3 sm:mb-4 md:mb-6 lg:mb-8">
+            <PriceAlerts coin={marketData.coin} />
+          </div>
+        )}
       </main>
     </div>
   );
