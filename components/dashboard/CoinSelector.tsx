@@ -203,7 +203,7 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
           >
-            <div className="p-3 sm:p-4 border-b border-gray-200">
+            <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-800">
               <Input
                 variant="search"
                 placeholder="Search coins..."
@@ -222,16 +222,16 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                 // Show favorites when no search query
                 <>
                   {favorites.length > 0 && (
-                    <div className="p-2 border-b border-gray-200">
-                      <p className="text-xs font-semibold text-gray-500 uppercase px-2">Favorites</p>
+                    <div className="p-2 border-b border-gray-200 dark:border-gray-800">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase px-2">Favorites</p>
                     </div>
                   )}
                   {isLoadingFavorites ? (
-                    <div className="p-4 text-center text-gray-500">
+                    <div className="p-4 text-center text-gray-500 dark:text-gray-400">
                       Loading favorites...
                     </div>
                   ) : favoriteCoins.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">
+                    <div className="p-4 text-center text-gray-500 dark:text-gray-400">
                       {favorites.length === 0 ? 'No favorites yet. Search for coins and star them to add to favorites.' : 'Loading favorites...'}
                     </div>
                   ) : (
@@ -239,7 +239,7 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                       <button
                         key={coin.id}
                         onClick={() => handleCoinSelect(coin.id)}
-                        className="w-full flex items-center p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[56px] touch-manipulation active:scale-[0.98] select-none"
+                        className="w-full flex items-center p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 dark:hover:bg-gray-800 dark:active:bg-gray-700 transition-colors min-h-[56px] touch-manipulation active:scale-[0.98] select-none"
                       >
                         <img
                           src={sanitizeUrl(coin.image)}
@@ -247,12 +247,12 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                           className="w-8 h-8 sm:w-8 sm:h-8 mr-3 rounded-full flex-shrink-0"
                         />
                         <div className="flex-1 text-left min-w-0">
-                          <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{escapeHtml(coin.name)}</p>
-                          <p className="text-xs sm:text-sm text-gray-500 uppercase">{escapeHtml(coin.symbol)}</p>
+                          <p className="font-medium text-gray-900 dark:text-gray-100 text-sm sm:text-base truncate">{escapeHtml(coin.name)}</p>
+                          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 uppercase">{escapeHtml(coin.symbol)}</p>
                         </div>
                         <button
                           onClick={(e) => handleToggleFavorite(e, coin)}
-                          className="p-1.5 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0 ml-2 touch-manipulation"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors flex-shrink-0 ml-2 touch-manipulation"
                           aria-label={isFavorite(coin.id) ? 'Remove from favorites' : 'Add to favorites'}
                         >
                           <Star 
@@ -260,7 +260,7 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                           />
                         </button>
                         {coin.market_cap_rank && (
-                          <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                          <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 ml-2">
                             #{coin.market_cap_rank}
                           </span>
                         )}
@@ -272,11 +272,11 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                 // Show search results
                 <>
                   {isLoading ? (
-                    <div className="p-4 text-center text-gray-500">
+                    <div className="p-4 text-center text-gray-500 dark:text-gray-400">
                       Loading coins...
                     </div>
                   ) : coins.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">
+                    <div className="p-4 text-center text-gray-500 dark:text-gray-400">
                       No coins found
                     </div>
                   ) : (
@@ -284,7 +284,7 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                       <button
                         key={coin.id}
                         onClick={() => handleCoinSelect(coin.id)}
-                        className="w-full flex items-center p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[56px] touch-manipulation active:scale-[0.98] select-none"
+                        className="w-full flex items-center p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 dark:hover:bg-gray-800 dark:active:bg-gray-700 transition-colors min-h-[56px] touch-manipulation active:scale-[0.98] select-none"
                       >
                         <img
                           src={sanitizeUrl(coin.image)}
@@ -292,12 +292,12 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                           className="w-8 h-8 sm:w-8 sm:h-8 mr-3 rounded-full flex-shrink-0"
                         />
                         <div className="flex-1 text-left min-w-0">
-                          <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{escapeHtml(coin.name)}</p>
-                          <p className="text-xs sm:text-sm text-gray-500 uppercase">{escapeHtml(coin.symbol)}</p>
+                          <p className="font-medium text-gray-900 dark:text-gray-100 text-sm sm:text-base truncate">{escapeHtml(coin.name)}</p>
+                          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 uppercase">{escapeHtml(coin.symbol)}</p>
                         </div>
                         <button
                           onClick={(e) => handleToggleFavorite(e, coin)}
-                          className="p-1.5 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0 ml-2 touch-manipulation"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors flex-shrink-0 ml-2 touch-manipulation"
                           aria-label={isFavorite(coin.id) ? 'Remove from favorites' : 'Add to favorites'}
                         >
                           <Star 
@@ -305,7 +305,7 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
                           />
                         </button>
                         {coin.market_cap_rank && (
-                          <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                          <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 ml-2">
                             #{coin.market_cap_rank}
                           </span>
                         )}

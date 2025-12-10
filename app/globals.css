@@ -11,6 +11,8 @@
     -webkit-overflow-scrolling: touch;
     /* Prevent pull-to-refresh on mobile */
     overscroll-behavior-y: contain;
+    /* Smooth theme transitions */
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
   
   body {
@@ -21,6 +23,26 @@
     overscroll-behavior-x: none;
     /* Better touch scrolling */
     -webkit-overflow-scrolling: touch;
+    /* Smooth theme transitions */
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  html.dark body {
+    @apply bg-gray-950 text-gray-100;
+  }
+
+  /* Smooth transitions for theme changes - target common elements */
+  div, section, article, aside, header, footer, nav, main,
+  button, a, input, textarea, select, label,
+  h1, h2, h3, h4, h5, h6, p, span, li, td, th {
+    transition-property: background-color, border-color, color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+  }
+
+  /* Exclude elements that shouldn't transition (like SVG paths, images) */
+  svg, img, video, canvas {
+    transition-property: none;
   }
 
   /* Improve touch interactions */
@@ -56,6 +78,11 @@
 @layer components {
   .card {
     @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  }
+
+  .dark .card {
+    @apply bg-gray-900 border-gray-800 text-gray-100;
   }
   
   .metric-card {

@@ -82,6 +82,8 @@ export interface DashboardState {
   lastUpdated: Date | null;
 }
 
+export type Theme = 'light' | 'dark';
+
 export interface ExchangeRates {
   base: string;
   rates: Record<string, number>;
@@ -105,7 +107,7 @@ export interface ChartCustomizationSettings {
   fontSize: number;
   
   // Theme
-  theme: 'light' | 'dark';
+  theme: Theme;
   
   // Animation
   enableAnimation: boolean;

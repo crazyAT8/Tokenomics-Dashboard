@@ -341,14 +341,15 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     : { top: 10, right: 30, left: 30, bottom: 60 };
 
   // Apply customization settings
+  const isDark = customization?.theme === 'dark' || (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
   const lineColor = customization?.lineColor || '#3b82f6';
-  const gridColor = customization?.gridColor || '#f0f0f0';
-  const axisColor = customization?.axisColor || '#666';
+  const gridColor = customization?.gridColor || (isDark ? '#1f2937' : '#f0f0f0');
+  const axisColor = customization?.axisColor || (isDark ? '#e5e7eb' : '#666');
   const showGrid = customization?.showGrid !== false;
   const showAxisLabels = customization?.showAxisLabels !== false;
   const fontSize = customization?.fontSize || (isSmallMobile ? 9 : isMobile ? 10 : 12);
   const lineWidth = customization?.lineWidth || 2;
-  const backgroundColor = customization?.backgroundColor || '#ffffff';
+  const backgroundColor = customization?.backgroundColor || (isDark ? '#0f172a' : '#ffffff');
 
 
   // Render candlesticks as custom SVG overlay

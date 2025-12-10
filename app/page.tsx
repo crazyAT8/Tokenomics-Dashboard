@@ -56,6 +56,8 @@ export default function Dashboard() {
     chartCustomization,
     setChartCustomization,
     resetChartCustomization,
+  theme,
+  toggleTheme,
   } = useDashboardStore();
   const { marketData, isLoading, error, errorDetails: hookErrorDetails, retryCount: hookRetryCount, refreshData } = useCoinData();
   const networkStatusHook = useNetworkStatus();
@@ -75,6 +77,16 @@ export default function Dashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [networkStatusHook.isOnline, networkStatusHook.wasOffline]);
+
+  // Apply theme class to document root
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [theme]);
 
   // Fetch favorite coins data for portfolio overview
   useEffect(() => {
@@ -140,11 +152,11 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4 text-gray-900 dark:text-gray-100">
         <Card className="max-w-md w-full mx-auto">
           <CardContent className="p-4 sm:p-6 text-center">
             <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
               {displayErrorDetails?.isNetworkError 
                 ? 'Connection Error' 
                 : displayErrorDetails?.isTimeoutError
@@ -153,9 +165,9 @@ export default function Dashboard() {
                 ? 'Rate Limit Exceeded'
                 : 'Error Loading Data'}
             </h2>
-            <p className="text-sm sm:text-base text-gray-600 mb-2 break-words">{escapeHtml(error)}</p>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-2 break-words">{escapeHtml(error)}</p>
             {displayErrorDetails && (
-              <div className="text-xs sm:text-sm text-gray-500 mb-4">
+              <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-4">
                 {displayErrorDetails.isNetworkError && (
                   <p>Please check your internet connection.</p>
                 )}
@@ -194,12 +206,14 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors">
       <Header 
         onRefresh={refreshData}
         isLoading={isLoading}
         lastUpdated={marketData ? new Date() : null}
         networkStatus={networkStatus}
+        theme={theme}
+        onThemeToggle={toggleTheme}
       />
       
       <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-6 lg:py-8">
@@ -221,8 +235,8 @@ export default function Dashboard() {
                   touch-manipulation active:scale-[0.97] select-none
                   flex items-center justify-center
                   ${isFavorite(marketData.coin.id)
-                    ? 'bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100'
-                    : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                    ? 'bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100 dark:bg-yellow-900/30 dark:border-yellow-500 dark:text-yellow-200 dark:hover:bg-yellow-800/40'
+                    : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800'
                   }
                 `}
                 aria-label={isFavorite(marketData.coin.id) ? 'Remove from favorites' : 'Add to favorites'}

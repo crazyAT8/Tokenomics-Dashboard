@@ -12,9 +12,9 @@ export const Card: React.FC<CardProps> = ({
   ...props
 }) => {
   const variants = {
-    default: 'bg-white rounded-lg shadow-sm border border-gray-200',
-    outlined: 'bg-white rounded-lg border border-gray-300',
-    elevated: 'bg-white rounded-lg shadow-lg border border-gray-200',
+    default: 'bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800',
+    outlined: 'bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800',
+    elevated: 'bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800',
   };
 
   return (
@@ -64,7 +64,7 @@ export const CardDescription: React.FC<React.HTMLAttributes<HTMLParagraphElement
 }) => {
   return (
     <p
-      className={clsx('text-sm text-gray-500', className)}
+      className={clsx('text-sm text-gray-500 dark:text-gray-400', className)}
       {...props}
     >
       {children}

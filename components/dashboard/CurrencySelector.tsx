@@ -79,8 +79,8 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({
           <Card 
             className="absolute top-full left-0 right-0 mt-2 z-50 max-h-[calc(100vh-180px)] sm:max-h-96 overflow-hidden shadow-xl"
           >
-            <div className="p-3 sm:p-4 border-b border-gray-200">
-              <h3 className="text-sm font-medium text-gray-700">Select Currency</h3>
+            <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-800">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-100">Select Currency</h3>
             </div>
             <div 
               className="max-h-[calc(100vh-280px)] sm:max-h-64 overflow-y-auto overscroll-contain scroll-smooth-touch"
@@ -91,8 +91,8 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                   <button
                     key={currency}
                     onClick={() => handleCurrencySelect(currency)}
-                    className={`w-full flex items-center justify-between p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 transition-colors min-h-[56px] touch-manipulation active:scale-[0.98] select-none ${
-                      selectedCurrency === currency ? 'bg-primary-50' : ''
+                    className={`w-full flex items-center justify-between p-3 sm:p-3 hover:bg-gray-50 active:bg-gray-100 dark:hover:bg-gray-800 dark:active:bg-gray-700 transition-colors min-h-[56px] touch-manipulation active:scale-[0.98] select-none ${
+                      selectedCurrency === currency ? 'bg-primary-50 dark:bg-primary-900/30' : 'bg-white dark:bg-gray-900'
                     }`}
                   >
                     <div className="flex items-center min-w-0 flex-1">
@@ -100,10 +100,10 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({
                         {info.symbol}
                       </span>
                       <div className="flex-1 text-left min-w-0">
-                        <p className="font-medium text-gray-900 text-sm sm:text-base">
+                        <p className="font-medium text-gray-900 dark:text-gray-100 text-sm sm:text-base">
                           {info.code}
                         </p>
-                        <p className="text-xs sm:text-sm text-gray-500">
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                           {info.name}
                         </p>
                       </div>

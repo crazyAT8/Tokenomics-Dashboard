@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DashboardState, MarketData, ChartType, TechnicalAnalysisSettings, ChartCustomizationSettings } from './types';
+import { DashboardState, MarketData, ChartType, TechnicalAnalysisSettings, ChartCustomizationSettings, Theme } from './types';
 import { ApiError } from './utils/errorHandler';
 import { TimeRange } from '@/components/dashboard/TimeRangeSelector';
 
@@ -18,6 +18,7 @@ interface ExtendedDashboardState extends DashboardState {
   chartType: ChartType;
   technicalAnalysis: TechnicalAnalysisSettings;
   chartCustomization: ChartCustomizationSettings;
+  theme: Theme;
 }
 
 interface DashboardStore extends ExtendedDashboardState {
@@ -37,6 +38,8 @@ interface DashboardStore extends ExtendedDashboardState {
   toggleTechnicalIndicator: (indicator: keyof TechnicalAnalysisSettings) => void;
   setChartCustomization: (settings: Partial<ChartCustomizationSettings>) => void;
   resetChartCustomization: () => void;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
 }
 
 export const useDashboardStore = create<DashboardStore>()(
@@ -80,6 +83,7 @@ export const useDashboardStore = create<DashboardStore>()(
         theme: 'light',
         enableAnimation: true,
       },
+      theme: 'light',
 
       setSelectedCoin: (coin) => set({ selectedCoin: coin }),
       setMarketData: (data) => set({ marketData: data, error: null, errorDetails: null, retryCount: 0 }),
@@ -125,6 +129,11 @@ export const useDashboardStore = create<DashboardStore>()(
             enableAnimation: true,
           },
         }),
+      setTheme: (theme) => set({ theme }),
+      toggleTheme: () =>
+        set((state) => ({
+          theme: state.theme === 'light' ? 'dark' : 'light',
+        })),
     }),
     {
       name: 'dashboard-storage',
@@ -135,6 +144,7 @@ export const useDashboardStore = create<DashboardStore>()(
         chartType: state.chartType,
         technicalAnalysis: state.technicalAnalysis,
         chartCustomization: state.chartCustomization,
+        theme: state.theme,
       }),
     }
   )

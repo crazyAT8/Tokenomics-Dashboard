@@ -40,29 +40,29 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
+    <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded-lg overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gray-50 transition-colors min-h-[44px] sm:min-h-[40px] touch-manipulation"
+        className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors min-h-[44px] sm:min-h-[40px] touch-manipulation"
       >
         <div className="flex items-center gap-2 sm:gap-3">
-          <Palette className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
-          <span className="text-sm sm:text-base font-medium text-gray-700">
+          <Palette className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 dark:text-gray-300" />
+          <span className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-100">
             Chart Customization
           </span>
         </div>
         {isExpanded ? (
-          <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
+          <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500 dark:text-gray-400" />
         ) : (
-          <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
+          <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500 dark:text-gray-400" />
         )}
       </button>
 
       {isExpanded && (
-        <div className="border-t border-gray-200 p-3 sm:p-4 space-y-4">
+        <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-4 space-y-4 bg-white dark:bg-gray-900">
           {/* Color Customization */}
           <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100 mb-2">
               <Palette className="h-4 w-4 inline mr-1" />
               Line Color
             </label>
@@ -74,8 +74,8 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
                   className={`
                     w-10 h-10 rounded-md border-2 transition-all touch-manipulation active:scale-[0.95]
                     ${settings.lineColor === preset.value
-                      ? 'border-gray-800 ring-2 ring-offset-2 ring-gray-400'
-                      : 'border-gray-300 hover:border-gray-400'
+                      ? 'border-gray-800 dark:border-gray-100 ring-2 ring-offset-2 ring-gray-400 dark:ring-gray-600'
+                      : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500'
                     }
                   `}
                   style={{ backgroundColor: preset.value }}
@@ -98,7 +98,7 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
           {/* Display Options */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700">
+              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100">
                 <Grid3x3 className="h-4 w-4" />
                 Show Grid
               </label>
@@ -121,7 +121,7 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
             </div>
 
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700">
+              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100">
                 <Type className="h-4 w-4" />
                 Show Axis Labels
               </label>
@@ -144,7 +144,7 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
             </div>
 
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700">
+              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100">
                 <Sparkles className="h-4 w-4" />
                 Animation
               </label>
@@ -170,7 +170,7 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
           {/* Sliders */}
           <div className="space-y-3">
             <div>
-              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700 mb-2">
+              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100 mb-2">
                 <Gauge className="h-4 w-4" />
                 Line Width: {settings.lineWidth.toFixed(1)}px
               </label>
@@ -189,7 +189,7 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
             </div>
 
             <div>
-              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700 mb-2">
+              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100 mb-2">
                 <Type className="h-4 w-4" />
                 Font Size: {settings.fontSize}px
               </label>
@@ -208,7 +208,7 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
             </div>
 
             <div>
-              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700 mb-2">
+              <label className="flex items-center gap-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100 mb-2">
                 Chart Height: {settings.chartHeight ? `${settings.chartHeight}px` : 'Auto'}
               </label>
               <div className="flex gap-2">
@@ -233,7 +233,7 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
 
           {/* Theme Selection */}
           <div>
-            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-100 mb-2">
               Theme
             </label>
             <div className="flex gap-2">
@@ -249,7 +249,7 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
                   min-h-[44px] sm:min-h-[36px] touch-manipulation active:scale-[0.97]
                   ${settings.theme === 'light'
                     ? 'bg-primary-50 border-primary-300 text-primary-700'
-                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                    : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }
                 `}
               >
@@ -268,7 +268,7 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
                   min-h-[44px] sm:min-h-[36px] touch-manipulation active:scale-[0.97]
                   ${settings.theme === 'dark'
                     ? 'bg-primary-50 border-primary-300 text-primary-700'
-                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                    : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }
                 `}
               >
@@ -279,10 +279,10 @@ export const ChartCustomizationControls: React.FC<ChartCustomizationControlsProp
           </div>
 
           {/* Reset Button */}
-          <div className="pt-2 border-t border-gray-200">
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
             <button
               onClick={onReset}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors min-h-[44px] sm:min-h-[36px] touch-manipulation active:scale-[0.97]"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-100 rounded-md transition-colors min-h-[44px] sm:min-h-[36px] touch-manipulation active:scale-[0.97]"
             >
               <RotateCcw className="h-4 w-4" />
               <span className="text-xs sm:text-sm font-medium">Reset to Defaults</span>

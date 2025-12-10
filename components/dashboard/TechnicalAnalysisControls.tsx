@@ -91,14 +91,14 @@ export const TechnicalAnalysisControls: React.FC<TechnicalAnalysisControlsProps>
   const activeCount = Object.values(settings).filter(Boolean).length;
 
   return (
-    <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
+    <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded-lg overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gray-50 transition-colors min-h-[44px] sm:min-h-[40px] touch-manipulation"
+        className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors min-h-[44px] sm:min-h-[40px] touch-manipulation"
       >
         <div className="flex items-center gap-2 sm:gap-3">
-          <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
-          <span className="text-sm sm:text-base font-medium text-gray-700">
+          <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 dark:text-gray-300" />
+          <span className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-100">
             Technical Analysis
           </span>
           {activeCount > 0 && (
@@ -108,14 +108,14 @@ export const TechnicalAnalysisControls: React.FC<TechnicalAnalysisControlsProps>
           )}
         </div>
         {isExpanded ? (
-          <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
+          <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500 dark:text-gray-400" />
         ) : (
-          <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
+          <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500 dark:text-gray-400" />
         )}
       </button>
 
       {isExpanded && (
-        <div className="border-t border-gray-200 p-3 sm:p-4">
+        <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-4 bg-white dark:bg-gray-900">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
             {indicators.map((indicator) => {
               const Icon = indicator.icon;
@@ -130,23 +130,23 @@ export const TechnicalAnalysisControls: React.FC<TechnicalAnalysisControlsProps>
                     min-h-[44px] sm:min-h-[36px] touch-manipulation active:scale-[0.97]
                     text-left
                     ${isActive
-                      ? 'bg-primary-50 border-primary-300 text-primary-700'
-                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                      ? 'bg-primary-50 border-primary-300 text-primary-700 dark:bg-primary-900/30 dark:border-primary-500 dark:text-primary-100'
+                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:border-gray-800 dark:text-gray-100 dark:hover:bg-gray-800'
                     }
                   `}
                   aria-label={`${isActive ? 'Hide' : 'Show'} ${indicator.label}`}
                 >
                   <div className={`
                     flex-shrink-0 p-1.5 rounded
-                    ${isActive ? 'bg-primary-100' : 'bg-gray-100'}
+                    ${isActive ? 'bg-primary-100 dark:bg-primary-900/40' : 'bg-gray-100 dark:bg-gray-800'}
                   `}>
-                    <Icon className={`h-4 w-4 ${isActive ? indicator.color : 'text-gray-500'}`} />
+                    <Icon className={`h-4 w-4 ${isActive ? indicator.color : 'text-gray-500 dark:text-gray-300'}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs sm:text-sm font-medium truncate">
                       {indicator.label}
                     </div>
-                    <div className="text-xs text-gray-500 truncate hidden sm:block">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate hidden sm:block">
                       {indicator.description}
                     </div>
                   </div>
@@ -154,7 +154,7 @@ export const TechnicalAnalysisControls: React.FC<TechnicalAnalysisControlsProps>
                     flex-shrink-0 w-5 h-5 rounded border-2 transition-all
                     ${isActive
                       ? 'bg-primary-600 border-primary-600'
-                      : 'border-gray-300'
+                      : 'border-gray-300 dark:border-gray-700'
                     }
                   `}>
                     {isActive && (

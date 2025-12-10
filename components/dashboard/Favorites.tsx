@@ -104,8 +104,8 @@ export const Favorites: React.FC<FavoritesProps> = ({
                     flex flex-col items-start px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border transition-all
                     min-w-[140px] sm:min-w-[160px] flex-shrink-0 touch-manipulation active:scale-[0.97]
                     ${isSelected
-                      ? 'bg-primary-50 border-primary-400 shadow-md ring-2 ring-primary-200'
-                      : 'bg-white border-gray-200 hover:border-primary-300 hover:bg-primary-50/50 hover:shadow-sm'
+                      ? 'bg-primary-50 border-primary-400 shadow-md ring-2 ring-primary-200 dark:bg-primary-900/30 dark:border-primary-500 dark:ring-primary-700/60'
+                      : 'bg-white border-gray-200 hover:border-primary-300 hover:bg-primary-50/50 hover:shadow-sm dark:bg-gray-900 dark:border-gray-800 dark:hover:border-primary-500 dark:hover:bg-primary-900/30'
                     }
                   `}
                 >

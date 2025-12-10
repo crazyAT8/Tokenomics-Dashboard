@@ -104,20 +104,20 @@ export const CurrencyRates: React.FC<CurrencyRatesProps> = ({
             {ratesToShow.map(({ currency, code, rate, info }) => (
               <div
                 key={currency}
-                className="p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <div className="flex items-center mb-2">
                   <span className="text-lg sm:text-xl font-medium mr-2">
                     {info.symbol}
                   </span>
-                  <span className="text-xs sm:text-sm font-medium text-gray-700">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200">
                     {code}
                   </span>
                 </div>
-                <p className="text-sm sm:text-base font-semibold text-gray-900">
+                <p className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">
                   {rate ? formatRate(rate) : 'N/A'}
                 </p>
-                <p className="text-xs text-gray-500 mt-1 truncate">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
                   {info.name}
                 </p>
               </div>

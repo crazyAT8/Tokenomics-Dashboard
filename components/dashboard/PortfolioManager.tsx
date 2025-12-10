@@ -316,14 +316,14 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
   }, [showAddForm]);
 
   return (
-    <div className="bg-white border border-gray-300 rounded-lg overflow-hidden">
+    <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded-lg overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gray-50 transition-colors min-h-[44px] sm:min-h-[40px] touch-manipulation"
+        className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors min-h-[44px] sm:min-h-[40px] touch-manipulation"
       >
         <div className="flex items-center gap-2 sm:gap-3">
-          <Wallet className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
-          <span className="text-sm sm:text-base font-medium text-gray-700">
+          <Wallet className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 dark:text-gray-300" />
+          <span className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-100">
             Portfolio Tracking
           </span>
           {portfolio.length > 0 && (
@@ -333,14 +333,14 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
           )}
         </div>
         {isExpanded ? (
-          <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
+          <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500 dark:text-gray-400" />
         ) : (
-          <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
+          <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500 dark:text-gray-400" />
         )}
       </button>
 
       {isExpanded && (
-        <div className="border-t border-gray-200 p-3 sm:p-4 space-y-4">
+        <div className="border-t border-gray-200 dark:border-gray-800 p-3 sm:p-4 space-y-4 bg-white dark:bg-gray-900">
           {/* Portfolio Performance Metrics */}
           {portfolio.length > 0 && portfolioCoinsData.length > 0 && (
             <PortfolioPerformanceMetrics
@@ -354,36 +354,36 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
 
           {/* Portfolio Summary */}
           {portfolio.length > 0 && (
-            <div className="bg-gray-50 rounded-lg p-3 sm:p-4 space-y-2">
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 sm:p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs sm:text-sm font-medium text-gray-600">
+                <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">
                   Total Portfolio Value
                 </span>
-                <span className="text-base sm:text-lg font-bold text-gray-900">
+                <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
                   {formatCurrency(totals.totalValue, currency)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs sm:text-sm font-medium text-gray-600">
+                <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">
                   Net Invested (contrib - withdrawals)
                 </span>
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
                   {formatCurrency(totals.netInvested, currency)}
                 </span>
               </div>
               {totals.totalCostBasis > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-xs sm:text-sm font-medium text-gray-600">
+                  <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">
                     Total Cost Basis (open)
                   </span>
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
                     {formatCurrency(totals.totalCostBasis, currency)}
                   </span>
                 </div>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-gray-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs sm:text-sm font-medium text-gray-600">Realized P&L</span>
+                  <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Realized P&L</span>
                   <div className="flex items-center gap-2">
                     {totals.totalRealized >= 0 ? (
                       <TrendingUp className="h-4 w-4 text-green-600" />
@@ -400,7 +400,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs sm:text-sm font-medium text-gray-600">Unrealized P&L</span>
+                  <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Unrealized P&L</span>
                   <div className="flex items-center gap-2">
                     {totals.totalUnrealized >= 0 ? (
                       <TrendingUp className="h-4 w-4 text-green-600" />
@@ -417,8 +417,8 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                <span className="text-xs sm:text-sm font-medium text-gray-600">
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                <span className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">
                   Total P&L
                 </span>
                 <div className="flex items-center gap-2">
@@ -439,17 +439,17 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                   </span>
                 </div>
               </div>
-              <div className="text-xs text-gray-500 pt-1">
+              <div className="text-xs text-gray-500 dark:text-gray-400 pt-1">
                 {portfolio.length} {portfolio.length === 1 ? 'coin' : 'coins'} in portfolio
               </div>
             </div>
           )}
 
           {/* Contributions / Withdrawals */}
-          <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 space-y-3">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 sm:p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs sm:text-sm font-semibold text-gray-700">Cash Flow</h3>
-              <span className="text-xs text-gray-500">
+              <h3 className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-100">Cash Flow</h3>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
                 Net: {formatCurrency(totals.netInvested, currency)}
               </span>
             </div>
@@ -468,10 +468,10 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
                 placeholder="Note (optional)"
                 value={contributionNote}
                 onChange={(e) => setContributionNote(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 min-h-[36px] text-sm"
+                className="border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md px-3 py-2 min-h-[36px] text-sm"
               />
               <select
-                className="border border-gray-300 rounded-md px-3 py-2 min-h-[36px] text-sm"
+                className="border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md px-3 py-2 min-h-[36px] text-sm"
                 value={contributionType}
                 onChange={(e) => setContributionType(e.target.value as 'contribution' | 'withdrawal')}
               >
@@ -483,7 +483,7 @@ export const PortfolioManager: React.FC<PortfolioManagerProps> = ({
               </Button>
             </div>
             {contributions.length > 0 && (
-              <div className="text-xs text-gray-600">
+              <div className="text-xs text-gray-600 dark:text-gray-400">
                 {contributions.length} {contributions.length === 1 ? 'entry' : 'entries'} logged
               </div>
             )}
