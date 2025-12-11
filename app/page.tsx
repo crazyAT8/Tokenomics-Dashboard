@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDashboardStore } from '@/lib/store';
 import { useCoinData } from '@/hooks/useCoinData';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useFavorites } from '@/hooks/useFavorites';
+import { Button } from '@/components/ui/Button';
 import { Header } from '@/components/dashboard/Header';
 import { CoinSelector } from '@/components/dashboard/CoinSelector';
 import { TimeRangeSelector } from '@/components/dashboard/TimeRangeSelector';
@@ -27,17 +28,22 @@ import { CoinData } from '@/lib/types';
 import { usePriceAlertMonitor } from '@/hooks/usePriceAlertMonitor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { NetworkStatus } from '@/components/ui/NetworkStatus';
-import { 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
   BarChart3,
   Activity,
   AlertCircle,
   RefreshCw,
-  Star
+  Star,
+  Download,
+  FileText,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { sanitizeUrl, escapeHtml } from '@/lib/utils/sanitize';
+import { exportPriceReportPdf } from '@/lib/utils/pdfReport';
+import { exportChartAsImage } from '@/lib/utils/chartExport';
 
 export default function Dashboard() {
   const { 
@@ -67,6 +73,95 @@ export default function Dashboard() {
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
   const [favoriteCoins, setFavoriteCoins] = useState<CoinData[]>([]);
   const [isLoadingFavorites, setIsLoadingFavorites] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isExportingChart, setIsExportingChart] = useState(false);
+  const chartExportRef = useRef<HTMLDivElement | null>(null);
+
+  const handleExportPriceData = useCallback(() => {
+    if (!marketData) return;
+
+    const { coin, priceHistory, ohlcData } = marketData;
+    const isCandles = chartType === 'candlestick' && ohlcData && ohlcData.length > 0;
+    const rows = isCandles ? ohlcData! : priceHistory;
+
+    if (!rows || rows.length === 0) return;
+
+    const escapeCsv = (value: string | number | null | undefined) => {
+      if (value === null || value === undefined) return '';
+      const str = typeof value === 'number' ? value.toString() : value;
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+
+    const headers = isCandles
+      ? ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+      : ['timestamp', 'price'];
+
+    const dataRows = isCandles
+      ? (rows as NonNullable<typeof ohlcData>).map((item) => [
+          new Date(item.timestamp).toISOString(),
+          item.open,
+          item.high,
+          item.low,
+          item.close,
+          item.volume ?? '',
+        ])
+      : (rows as typeof priceHistory).map((item) => [
+          new Date(item.timestamp).toISOString(),
+          item.price,
+        ]);
+
+    const metaRow = [
+      escapeCsv(coin.name),
+      escapeCsv(coin.symbol.toUpperCase()),
+      escapeCsv(currency.toUpperCase()),
+      escapeCsv(isCandles ? 'candlestick' : 'line'),
+      escapeCsv(dataRows.length),
+    ];
+
+    const csvContent = [
+      'coin,symbol,currency,chart_type,points',
+      metaRow.join(','),
+      headers.join(','),
+      ...dataRows.map((row) => row.map(escapeCsv).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${coin.id}-${isCandles ? 'ohlc' : 'price'}-${currency}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [chartType, currency, marketData]);
+  const handleExportPdfReport = useCallback(async () => {
+    if (!marketData) return;
+    try {
+      setIsGeneratingPdf(true);
+      await exportPriceReportPdf({
+        marketData,
+        currency,
+        chartType,
+      });
+    } catch (err) {
+      console.error('Failed to generate PDF report', err);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }, [chartType, currency, marketData]);
+  const handleExportChartImage = useCallback(async () => {
+    if (!marketData || !chartExportRef.current) return;
+
+    try {
+      setIsExportingChart(true);
+      await exportChartAsImage(chartExportRef.current, {
+        fileName: `${marketData.coin.id}-${chartType}-chart.png`,
+      });
+    } catch (err) {
+      console.error('Failed to export chart image', err);
+    } finally {
+      setIsExportingChart(false);
+    }
+  }, [chartType, marketData]);
   
   // Monitor price alerts and trigger notifications
   usePriceAlertMonitor();
@@ -154,6 +249,11 @@ export default function Dashboard() {
 
   const displayErrorDetails = errorDetails || hookErrorDetails;
   const displayRetryCount = retryCount || hookRetryCount;
+  const canExportPriceData = marketData
+    ? chartType === 'candlestick'
+      ? !!(marketData.ohlcData && marketData.ohlcData.length > 0)
+      : marketData.priceHistory.length > 0
+    : false;
 
   if (error) {
     return (
@@ -345,40 +445,74 @@ export default function Dashboard() {
                         />
                         <span className="truncate">{escapeHtml(marketData.coin.name)} Price Chart</span>
                       </CardTitle>
+                    <div className="flex items-center gap-2">
                       <ChartTypeSelector
                         chartType={chartType}
                         onChartTypeChange={setChartType}
                       />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExportChartImage}
+                        disabled={!canExportPriceData || isExportingChart}
+                        className="min-h-[36px]"
+                      >
+                        <ImageIcon className="h-4 w-4 mr-1" />
+                        {isExportingChart ? 'Exporting...' : 'Export PNG'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExportPdfReport}
+                        disabled={!canExportPriceData || isGeneratingPdf}
+                        className="min-h-[36px]"
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        {isGeneratingPdf ? 'Generating...' : 'Export PDF'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExportPriceData}
+                        disabled={!canExportPriceData}
+                        className="min-h-[36px]"
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Export CSV
+                      </Button>
+                    </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-2 sm:p-3 md:p-4 lg:p-6 min-w-0">
-                    {chartType === 'candlestick' && marketData.ohlcData && marketData.ohlcData.length > 0 ? (
-                      <CandlestickChart 
-                        data={marketData.ohlcData} 
-                        currency={currency}
-                        technicalAnalysis={technicalAnalysis}
-                        customization={chartCustomization}
-                      />
-                    ) : (
-                      <PriceChart 
-                        data={marketData.priceHistory} 
-                        currency={currency}
-                        technicalAnalysis={technicalAnalysis}
-                        customization={chartCustomization}
-                      />
-                    )}
-                    {/* RSI/MACD Chart */}
-                    {(technicalAnalysis.showRSI || technicalAnalysis.showMACD) && (
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <TechnicalIndicatorsChart
-                          priceData={chartType === 'line' ? marketData.priceHistory : undefined}
-                          ohlcData={chartType === 'candlestick' ? marketData.ohlcData : undefined}
+                    <div ref={chartExportRef} className="min-w-0">
+                      {chartType === 'candlestick' && marketData.ohlcData && marketData.ohlcData.length > 0 ? (
+                        <CandlestickChart 
+                          data={marketData.ohlcData} 
                           currency={currency}
                           technicalAnalysis={technicalAnalysis}
                           customization={chartCustomization}
                         />
-                      </div>
-                    )}
+                      ) : (
+                        <PriceChart 
+                          data={marketData.priceHistory} 
+                          currency={currency}
+                          technicalAnalysis={technicalAnalysis}
+                          customization={chartCustomization}
+                        />
+                      )}
+                      {/* RSI/MACD Chart */}
+                      {(technicalAnalysis.showRSI || technicalAnalysis.showMACD) && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <TechnicalIndicatorsChart
+                            priceData={chartType === 'line' ? marketData.priceHistory : undefined}
+                            ohlcData={chartType === 'candlestick' ? marketData.ohlcData : undefined}
+                            currency={currency}
+                            technicalAnalysis={technicalAnalysis}
+                            customization={chartCustomization}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
