@@ -33,9 +33,29 @@ export const useExchangeRates = (baseCurrency: Currency = 'usd') => {
 
   useEffect(() => {
     fetchRates();
-    // Refresh rates every 5 minutes
-    const interval = setInterval(fetchRates, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    // Refresh rates every 10 minutes (increased from 5 min - exchange rates change less frequently)
+    // Only refresh when page is visible
+    const refreshRates = () => {
+      if (!document.hidden) {
+        fetchRates();
+      }
+    };
+    
+    const interval = setInterval(refreshRates, 10 * 60 * 1000);
+    
+    // Refresh when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchRates();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchRates]);
 
   return {

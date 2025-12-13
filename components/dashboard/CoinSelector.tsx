@@ -27,6 +27,7 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef<number>(0);
   const touchStartX = useRef<number>(0);
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
 
   const fetchCoins = async (query: string = '') => {
@@ -84,14 +85,30 @@ export const CoinSelector: React.FC<CoinSelectorProps> = ({
     }
   };
 
+  // Debounced search effect - only fetch after user stops typing
   useEffect(() => {
-    if (isOpen) {
-      if (searchQuery.trim() === '') {
-        fetchFavoriteCoins();
-      } else {
-        fetchCoins(searchQuery);
-      }
+    if (!isOpen) return;
+
+    // Clear any pending debounce
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
     }
+
+    if (searchQuery.trim() === '') {
+      // No search query - fetch favorites immediately
+      fetchFavoriteCoins();
+    } else {
+      // Debounce search queries - wait 400ms after user stops typing
+      searchDebounceRef.current = setTimeout(() => {
+        fetchCoins(searchQuery);
+      }, 400);
+    }
+
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
   }, [isOpen, searchQuery]);
 
   // Fetch favorite coins when favorites change (only when dropdown is open and no search query)

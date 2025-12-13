@@ -4,6 +4,7 @@ import { validateMarketData } from '@/lib/validation/validators';
 import { sanitizeCoinId, sanitizeCurrency, sanitizeNumber, sanitizeDate } from '@/lib/utils/sanitize';
 import { getCache } from '@/lib/cache/cache';
 import { CacheManager } from '@/lib/cache/cache';
+import { requestDeduplicator, generateRequestKey } from '@/lib/utils/requestDeduplication';
 
 export async function GET(
   request: NextRequest,
@@ -98,12 +99,27 @@ export async function GET(
 
     console.log('Cache miss for coin data:', coinId, '- fetching from API');
 
-    // Fetch data based on chart type
-    const [coinData, priceHistory, ohlcData] = await Promise.all([
-      fetchCoinData(coinId, currency),
-      fetchPriceHistory(coinId, priceHistoryOptions),
-      chartType === 'candlestick' ? fetchOHLC(coinId, ohlcOptions) : Promise.resolve(undefined),
-    ]);
+    // Generate request key for deduplication
+    const requestKey = generateRequestKey('coin-data-fetch', {
+      coinId,
+      currency,
+      chartType,
+      days: priceHistoryOptions.days,
+      from: fromParam,
+      to: toParam,
+    });
+
+    // Fetch data based on chart type with request deduplication
+    const [coinData, priceHistory, ohlcData] = await requestDeduplicator.deduplicate(
+      requestKey,
+      async () => {
+        return await Promise.all([
+          fetchCoinData(coinId, currency),
+          fetchPriceHistory(coinId, priceHistoryOptions),
+          chartType === 'candlestick' ? fetchOHLC(coinId, ohlcOptions) : Promise.resolve(undefined),
+        ]);
+      }
+    );
 
     const marketData = {
       coin: coinData,
@@ -127,9 +143,10 @@ export async function GET(
     const validatedMarketData = validateMarketData(marketData);
 
     // Cache the result with TTL based on data freshness needs
-    // Coin data changes frequently, so use shorter TTL (30 seconds)
-    // Historical data can be cached longer (5 minutes)
-    const ttl = fromParam && toParam ? 300 : 30; // 5 min for historical, 30s for current
+    // Coin data changes frequently, but we can cache longer since we have request deduplication
+    // Historical data can be cached longer (10 minutes)
+    // Current data cached for 2 minutes (increased from 30s for better performance)
+    const ttl = fromParam && toParam ? 600 : 120; // 10 min for historical, 2 min for current
     await cache.set(cacheKey, validatedMarketData, { ttl });
 
     return NextResponse.json(validatedMarketData);

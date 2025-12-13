@@ -4,6 +4,7 @@ import { validateExchangeRates } from '@/lib/validation/validators';
 import { sanitizeCurrency } from '@/lib/utils/sanitize';
 import { getCache } from '@/lib/cache/cache';
 import { CacheManager } from '@/lib/cache/cache';
+import { requestDeduplicator, generateRequestKey } from '@/lib/utils/requestDeduplication';
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,13 +26,19 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('Cache miss for exchange rates - fetching from API');
-    const exchangeRates = await fetchExchangeRates(baseCurrency);
+    
+    // Use request deduplication to prevent duplicate simultaneous requests
+    const requestKey = generateRequestKey('exchange-rates-fetch', { base: baseCurrency });
+    const exchangeRates = await requestDeduplicator.deduplicate(
+      requestKey,
+      () => fetchExchangeRates(baseCurrency)
+    );
     
     // Validate the exchange rates before sending (extra safety layer)
     const validatedExchangeRates = validateExchangeRates(exchangeRates);
     
-    // Cache exchange rates for 10 minutes (they change less frequently)
-    await cache.set(cacheKey, validatedExchangeRates, { ttl: 600 });
+    // Cache exchange rates for 15 minutes (increased from 10 min - they change less frequently)
+    await cache.set(cacheKey, validatedExchangeRates, { ttl: 900 });
     
     return NextResponse.json(validatedExchangeRates);
   } catch (error: any) {

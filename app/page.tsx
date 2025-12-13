@@ -223,11 +223,19 @@ export default function Dashboard() {
     fetchFavoriteCoins();
   }, [favorites]);
 
-  // Auto-refresh favorite coins data periodically (every 30 seconds)
+  // Auto-refresh favorite coins data periodically (every 2 minutes, only when page is visible)
   useEffect(() => {
     if (favorites.length === 0) return;
     
-    const interval = setInterval(async () => {
+    // Only refresh when page is visible (not in background tab)
+    const handleVisibilityChange = () => {
+      if (document.hidden) return; // Don't refresh when tab is hidden
+    };
+
+    const refreshFavorites = async () => {
+      // Skip if page is not visible
+      if (document.hidden) return;
+      
       try {
         const favoriteIds = favorites.map(fav => fav.id).join(',');
         const response = await fetch(`/api/coins/search?ids=${encodeURIComponent(favoriteIds)}&limit=${favorites.length}`);
@@ -242,9 +250,21 @@ export default function Dashboard() {
       } catch (error) {
         console.error('Error refreshing favorite coins:', error);
       }
-    }, 30000); // 30 seconds
+    };
 
-    return () => clearInterval(interval);
+    // Refresh immediately when favorites change
+    refreshFavorites();
+    
+    // Then refresh every 2 minutes (increased from 30 seconds for better performance)
+    const interval = setInterval(refreshFavorites, 2 * 60 * 1000);
+
+    // Listen for visibility changes to refresh when tab becomes visible
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [favorites]);
 
   const displayErrorDetails = errorDetails || hookErrorDetails;

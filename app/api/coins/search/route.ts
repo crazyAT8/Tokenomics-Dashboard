@@ -3,6 +3,7 @@ import { searchCoins, fetchTopCoins, fetchCoinsByIds } from '@/lib/api';
 import { sanitizeSearchQuery, sanitizeNumber, sanitizeCoinId } from '@/lib/utils/sanitize';
 import { getCache } from '@/lib/cache/cache';
 import { CacheManager } from '@/lib/cache/cache';
+import { requestDeduplicator, generateRequestKey } from '@/lib/utils/requestDeduplication';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,10 +28,13 @@ export async function GET(request: NextRequest) {
         }
 
         console.log('Cache miss for coins by IDs - fetching from API');
-        const coins = await fetchCoinsByIds(ids);
         
-        // Cache for 60 seconds (coin prices change frequently)
-        await cache.set(cacheKey, coins, { ttl: 60 });
+        // Use request deduplication to prevent duplicate simultaneous requests
+        const requestKey = generateRequestKey('coins-by-ids-fetch', { ids: ids.sort().join(',') });
+        const coins = await requestDeduplicator.deduplicate(requestKey, () => fetchCoinsByIds(ids));
+        
+        // Cache for 90 seconds (increased from 60s for better performance)
+        await cache.set(cacheKey, coins, { ttl: 90 });
         
         console.log('Search API - returning coins by IDs:', coins.length);
         return NextResponse.json(coins);
@@ -64,15 +68,22 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('Cache miss for coins search - fetching from API');
+    
+    // Use request deduplication to prevent duplicate simultaneous requests
+    const requestKey = generateRequestKey('coins-search-fetch', { 
+      query: query || 'top', 
+      limit 
+    });
+    
     let coins;
     if (query) {
-      coins = await searchCoins(query);
+      coins = await requestDeduplicator.deduplicate(requestKey, () => searchCoins(query));
     } else {
-      coins = await fetchTopCoins(limit);
+      coins = await requestDeduplicator.deduplicate(requestKey, () => fetchTopCoins(limit));
     }
 
-    // Cache search results for 2 minutes, top coins for 60 seconds
-    const ttl = query ? 120 : 60;
+    // Cache search results for 3 minutes, top coins for 90 seconds (increased for better performance)
+    const ttl = query ? 180 : 90;
     await cache.set(cacheKey, coins, { ttl });
 
     console.log('Search API - returning coins:', Array.isArray(coins) ? coins.length : 'not an array', coins);
