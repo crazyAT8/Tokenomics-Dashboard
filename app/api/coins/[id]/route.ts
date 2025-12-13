@@ -91,9 +91,63 @@ export async function GET(
     // Try to get from cache
     const cache = getCache();
     const cachedData = await cache.get(cacheKey);
+    
+    // Check if data needs refresh (stale-while-revalidate pattern)
+    const needsRefresh = await cache.needsRefresh(cacheKey);
 
     if (cachedData) {
-      console.log('Cache hit for coin data:', coinId);
+      console.log('Cache hit for coin data:', coinId, needsRefresh ? '(needs refresh)' : '');
+      
+      // If data needs refresh, trigger background refresh (non-blocking)
+      if (needsRefresh) {
+        const requestKey = generateRequestKey('coin-data-fetch', {
+          coinId,
+          currency,
+          chartType,
+          days: priceHistoryOptions.days,
+          from: fromParam,
+          to: toParam,
+        });
+        // Fire and forget - refresh in background
+        requestDeduplicator.deduplicate(
+          requestKey,
+          async () => {
+            try {
+              const [freshCoinData, freshPriceHistory, freshOhlcData] = await Promise.all([
+                fetchCoinData(coinId, currency),
+                fetchPriceHistory(coinId, priceHistoryOptions),
+                chartType === 'candlestick' ? fetchOHLC(coinId, ohlcOptions) : Promise.resolve(undefined),
+              ]);
+              
+              const freshMarketData = {
+                coin: freshCoinData,
+                priceHistory: freshPriceHistory,
+                ohlcData: freshOhlcData,
+                tokenomics: {
+                  circulating_supply: freshCoinData.circulating_supply,
+                  total_supply: freshCoinData.total_supply,
+                  max_supply: freshCoinData.max_supply,
+                  market_cap: freshCoinData.market_cap,
+                  fully_diluted_valuation: freshCoinData.fully_diluted_valuation,
+                  price: freshCoinData.current_price,
+                  price_change_24h: freshCoinData.price_change_24h,
+                  price_change_percentage_24h: freshCoinData.price_change_percentage_24h,
+                  volume_24h: freshCoinData.total_volume,
+                  market_cap_rank: freshCoinData.market_cap_rank,
+                },
+              };
+              
+              const validatedData = validateMarketData(freshMarketData);
+              const ttl = fromParam && toParam ? 600 : 120;
+              const refreshInterval = fromParam && toParam ? 420 : 60; // 7 min for historical, 1 min for current
+              await cache.set(cacheKey, validatedData, { ttl, refreshInterval });
+            } catch (error) {
+              console.error('Background refresh failed for coin data:', error);
+            }
+          }
+        ).catch(err => console.error('Background refresh error:', err));
+      }
+      
       return NextResponse.json(cachedData);
     }
 
@@ -144,10 +198,11 @@ export async function GET(
 
     // Cache the result with TTL based on data freshness needs
     // Coin data changes frequently, but we can cache longer since we have request deduplication
-    // Historical data can be cached longer (10 minutes)
-    // Current data cached for 2 minutes (increased from 30s for better performance)
+    // Historical data can be cached longer (10 minutes), refresh after 7 minutes
+    // Current data cached for 2 minutes, refresh after 1 minute
     const ttl = fromParam && toParam ? 600 : 120; // 10 min for historical, 2 min for current
-    await cache.set(cacheKey, validatedMarketData, { ttl });
+    const refreshInterval = fromParam && toParam ? 420 : 60; // 7 min for historical, 1 min for current
+    await cache.set(cacheKey, validatedMarketData, { ttl, refreshInterval });
 
     return NextResponse.json(validatedMarketData);
   } catch (error: any) {

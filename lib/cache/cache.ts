@@ -1,15 +1,26 @@
 /**
  * Cache utility with support for Redis and in-memory caching
  * Automatically falls back to in-memory cache if Redis is unavailable
+ * Supports refresh intervals for stale-while-revalidate pattern
  */
 
 interface CacheOptions {
   ttl?: number; // Time to live in seconds
+  refreshInterval?: number; // Refresh interval in seconds (data will be marked for refresh before TTL expires)
   namespace?: string; // Namespace prefix for cache keys
 }
 
 interface CacheEntry<T> {
   data: T;
+  expiresAt: number;
+  refreshedAt: number; // Timestamp when data was last refreshed
+  refreshAt: number; // Timestamp when data should be refreshed (before expiration)
+}
+
+interface CachedValue<T> {
+  data: T;
+  refreshedAt: number;
+  refreshAt: number;
   expiresAt: number;
 }
 
@@ -37,7 +48,23 @@ class InMemoryCache {
     return entry.data as T;
   }
 
-  async set<T>(key: string, value: T, ttl: number): Promise<void> {
+  async getWithMetadata<T>(key: string): Promise<CacheEntry<T> | null> {
+    const entry = this.cache.get(key);
+    
+    if (!entry) {
+      return null;
+    }
+
+    // Check if expired
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return entry as CacheEntry<T>;
+  }
+
+  async set<T>(key: string, value: T, ttl: number, refreshInterval?: number): Promise<void> {
     // Evict oldest entries if cache is full
     if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
       const firstKey = this.cache.keys().next().value;
@@ -46,8 +73,19 @@ class InMemoryCache {
       }
     }
 
-    const expiresAt = Date.now() + ttl * 1000;
-    this.cache.set(key, { data: value, expiresAt });
+    const now = Date.now();
+    const expiresAt = now + ttl * 1000;
+    // If refreshInterval is set, refresh before expiration, otherwise refresh at expiration
+    const refreshAt = refreshInterval 
+      ? now + refreshInterval * 1000 
+      : expiresAt;
+    
+    this.cache.set(key, { 
+      data: value, 
+      expiresAt,
+      refreshedAt: now,
+      refreshAt
+    });
   }
 
   async delete(key: string): Promise<void> {
@@ -130,21 +168,87 @@ class RedisCache {
         return null;
       }
 
-      return JSON.parse(value) as T;
+      const parsed = JSON.parse(value) as CachedValue<T> | T;
+      
+      // Check if it's the new format with metadata
+      if (parsed && typeof parsed === 'object' && 'data' in parsed && 'refreshedAt' in parsed) {
+        return (parsed as CachedValue<T>).data;
+      }
+      
+      // Legacy format - return as is
+      return parsed as T;
     } catch (error) {
       console.error('Redis get error:', error);
       return null;
     }
   }
 
-  async set<T>(key: string, value: T, ttl: number): Promise<void> {
+  async getWithMetadata<T>(key: string): Promise<CacheEntry<T> | null> {
+    try {
+      const client = await this.getClient();
+      if (!client) {
+        return null;
+      }
+
+      const value = await client.get(key);
+      if (!value) {
+        return null;
+      }
+
+      const parsed = JSON.parse(value) as CachedValue<T> | T;
+      
+      // Check if it's the new format with metadata
+      if (parsed && typeof parsed === 'object' && 'data' in parsed && 'refreshedAt' in parsed && 'expiresAt' in parsed) {
+        const cached = parsed as CachedValue<T>;
+        // Check if expired
+        if (Date.now() > cached.expiresAt) {
+          await this.delete(key);
+          return null;
+        }
+        return {
+          data: cached.data,
+          expiresAt: cached.expiresAt,
+          refreshedAt: cached.refreshedAt,
+          refreshAt: cached.refreshAt,
+        };
+      }
+      
+      // Legacy format - return with estimated metadata
+      const now = Date.now();
+      return {
+        data: parsed as T,
+        expiresAt: now + 300000, // Default 5 min estimate
+        refreshedAt: now,
+        refreshAt: now + 300000,
+      };
+    } catch (error) {
+      console.error('Redis getWithMetadata error:', error);
+      return null;
+    }
+  }
+
+  async set<T>(key: string, value: T, ttl: number, refreshInterval?: number): Promise<void> {
     try {
       const client = await this.getClient();
       if (!client) {
         return;
       }
 
-      const serialized = JSON.stringify(value);
+      const now = Date.now();
+      const expiresAt = now + ttl * 1000;
+      const refreshAt = refreshInterval 
+        ? now + refreshInterval * 1000 
+        : expiresAt;
+
+      // Store with metadata
+      const cachedValue: CachedValue<T> = {
+        data: value,
+        refreshedAt: now,
+        refreshAt,
+        expiresAt,
+      };
+
+      const serialized = JSON.stringify(cachedValue);
       await client.setEx(key, ttl, serialized);
     } catch (error) {
       console.error('Redis set error:', error);
@@ -236,7 +340,8 @@ class CacheManager {
       if (value !== null) {
         // Also update memory cache for faster subsequent access
         const ttl = options?.ttl || this.defaultTTL;
-        await this.memoryCache.set(fullKey, value, ttl);
+        const refreshInterval = options?.refreshInterval;
+        await this.memoryCache.set(fullKey, value, ttl, refreshInterval);
         return value;
       }
     }
@@ -246,18 +351,56 @@ class CacheManager {
   }
 
   /**
+   * Get value from cache with refresh metadata
+   * Returns null if not found or expired, otherwise returns the entry with metadata
+   */
+  async getWithMetadata<T>(key: string, options?: CacheOptions): Promise<CacheEntry<T> | null> {
+    const fullKey = this.generateKey(key, options?.namespace);
+    
+    if (this.useRedis) {
+      const entry = await this.redisCache.getWithMetadata<T>(fullKey);
+      if (entry !== null) {
+        // Also update memory cache for faster subsequent access
+        const ttl = options?.ttl || this.defaultTTL;
+        const refreshInterval = options?.refreshInterval;
+        await this.memoryCache.set(fullKey, entry.data, ttl, refreshInterval);
+        return entry;
+      }
+    }
+
+    // Fallback to memory cache
+    return await this.memoryCache.getWithMetadata<T>(fullKey);
+  }
+
+  /**
+   * Check if cached data needs to be refreshed (stale-while-revalidate pattern)
+   * Returns true if data exists but should be refreshed in the background
+   */
+  async needsRefresh<T>(key: string, options?: CacheOptions): Promise<boolean> {
+    const entry = await this.getWithMetadata<T>(key, options);
+    if (!entry) {
+      return false;
+    }
+    
+    const now = Date.now();
+    // Data needs refresh if current time is past refreshAt but before expiresAt
+    return now >= entry.refreshAt && now < entry.expiresAt;
+  }
+
+  /**
    * Set value in cache (writes to both Redis and memory if available)
    */
   async set<T>(key: string, value: T, options?: CacheOptions): Promise<void> {
     const fullKey = this.generateKey(key, options?.namespace);
     const ttl = options?.ttl || this.defaultTTL;
+    const refreshInterval = options?.refreshInterval;
 
     // Write to memory cache (always available)
-    await this.memoryCache.set(fullKey, value, ttl);
+    await this.memoryCache.set(fullKey, value, ttl, refreshInterval);
 
     // Write to Redis if available
     if (this.useRedis) {
-      await this.redisCache.set(fullKey, value, ttl);
+      await this.redisCache.set(fullKey, value, ttl, refreshInterval);
     }
   }
 

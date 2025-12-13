@@ -22,8 +22,30 @@ export async function GET(request: NextRequest) {
         
         // Try cache first
         const cachedCoins = await cache.get(cacheKey);
+        const needsRefresh = await cache.needsRefresh(cacheKey);
+        
         if (cachedCoins) {
-          console.log('Cache hit for coins by IDs:', ids.length);
+          console.log('Cache hit for coins by IDs:', ids.length, needsRefresh ? '(needs refresh)' : '');
+          
+          // If data needs refresh, trigger background refresh (non-blocking)
+          if (needsRefresh) {
+            const requestKey = generateRequestKey('coins-by-ids-fetch', { ids: ids.sort().join(',') });
+            requestDeduplicator.deduplicate(
+              requestKey,
+              async () => {
+                try {
+                  const freshCoins = await fetchCoinsByIds(ids);
+                  await cache.set(cacheKey, freshCoins, { 
+                    ttl: 90, 
+                    refreshInterval: 60 // Refresh after 60 seconds
+                  });
+                } catch (error) {
+                  console.error('Background refresh failed for coins by IDs:', error);
+                }
+              }
+            ).catch(err => console.error('Background refresh error:', err));
+          }
+          
           return NextResponse.json(cachedCoins);
         }
 
@@ -33,8 +55,8 @@ export async function GET(request: NextRequest) {
         const requestKey = generateRequestKey('coins-by-ids-fetch', { ids: ids.sort().join(',') });
         const coins = await requestDeduplicator.deduplicate(requestKey, () => fetchCoinsByIds(ids));
         
-        // Cache for 90 seconds (increased from 60s for better performance)
-        await cache.set(cacheKey, coins, { ttl: 90 });
+        // Cache for 90 seconds, refresh after 60 seconds
+        await cache.set(cacheKey, coins, { ttl: 90, refreshInterval: 60 });
         
         console.log('Search API - returning coins by IDs:', coins.length);
         return NextResponse.json(coins);
@@ -62,8 +84,37 @@ export async function GET(request: NextRequest) {
 
     // Try cache first
     const cachedCoins = await cache.get(cacheKey);
+    const needsRefresh = await cache.needsRefresh(cacheKey);
+    
     if (cachedCoins) {
-      console.log('Cache hit for coins search');
+      console.log('Cache hit for coins search', needsRefresh ? '(needs refresh)' : '');
+      
+      // If data needs refresh, trigger background refresh (non-blocking)
+      if (needsRefresh) {
+        const requestKey = generateRequestKey('coins-search-fetch', { 
+          query: query || 'top', 
+          limit 
+        });
+        requestDeduplicator.deduplicate(
+          requestKey,
+          async () => {
+            try {
+              let freshCoins;
+              if (query) {
+                freshCoins = await searchCoins(query);
+              } else {
+                freshCoins = await fetchTopCoins(limit);
+              }
+              const ttl = query ? 180 : 90;
+              const refreshInterval = query ? 120 : 60; // 2 min for search, 1 min for top
+              await cache.set(cacheKey, freshCoins, { ttl, refreshInterval });
+            } catch (error) {
+              console.error('Background refresh failed for coins search:', error);
+            }
+          }
+        ).catch(err => console.error('Background refresh error:', err));
+      }
+      
       return NextResponse.json(cachedCoins);
     }
 
@@ -82,9 +133,10 @@ export async function GET(request: NextRequest) {
       coins = await requestDeduplicator.deduplicate(requestKey, () => fetchTopCoins(limit));
     }
 
-    // Cache search results for 3 minutes, top coins for 90 seconds (increased for better performance)
+    // Cache search results for 3 minutes (refresh after 2 min), top coins for 90 seconds (refresh after 60 sec)
     const ttl = query ? 180 : 90;
-    await cache.set(cacheKey, coins, { ttl });
+    const refreshInterval = query ? 120 : 60; // 2 min for search, 1 min for top
+    await cache.set(cacheKey, coins, { ttl, refreshInterval });
 
     console.log('Search API - returning coins:', Array.isArray(coins) ? coins.length : 'not an array', coins);
     return NextResponse.json(coins);

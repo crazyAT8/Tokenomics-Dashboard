@@ -52,17 +52,27 @@ CACHE_NAMESPACE=tokenomics        # Cache key namespace (default: tokenomics)
 
 If you don't set `REDIS_URL`, the application will automatically use in-memory caching. No additional configuration needed!
 
-## Cache TTLs (Time To Live)
+## Cache TTLs (Time To Live) and Refresh Intervals
 
-Different endpoints use different cache durations based on data volatility:
+The caching system uses a **stale-while-revalidate** pattern with refresh intervals. Data is cached with a TTL (Time To Live), and a refresh interval that triggers background updates before expiration.
 
-| Endpoint | TTL | Reason |
-|----------|-----|--------|
-| `/api/coins/[id]` (current data) | 30 seconds | Price data changes frequently |
-| `/api/coins/[id]` (historical) | 5 minutes | Historical data is stable |
-| `/api/coins/search` (top coins) | 60 seconds | Market rankings change often |
-| `/api/coins/search` (search query) | 2 minutes | Search results are more stable |
-| `/api/exchange-rates` | 10 minutes | Exchange rates change less frequently |
+### How Refresh Intervals Work
+
+- **TTL**: Maximum time data can be served from cache
+- **Refresh Interval**: Time after which data should be refreshed in the background
+- When data reaches the refresh interval (but before TTL expires), it's still served from cache, but a background refresh is triggered
+- This ensures users always get fast responses while keeping data fresh
+
+### Cache Configuration by Endpoint
+
+| Endpoint | TTL | Refresh Interval | Reason |
+|----------|-----|------------------|--------|
+| `/api/coins/[id]` (current data) | 2 minutes | 1 minute | Price data changes frequently, refresh often |
+| `/api/coins/[id]` (historical) | 10 minutes | 7 minutes | Historical data is stable, less frequent refresh |
+| `/api/coins/search` (top coins) | 90 seconds | 60 seconds | Market rankings change often |
+| `/api/coins/search` (search query) | 3 minutes | 2 minutes | Search results are more stable |
+| `/api/exchange-rates` | 15 minutes | 10 minutes | Exchange rates change less frequently |
+| `/api/coins/search` (by IDs) | 90 seconds | 60 seconds | Coin data updates frequently |
 
 ## Usage Examples
 
@@ -83,15 +93,31 @@ export async function GET(request: NextRequest) {
   
   // Try cache first
   const cached = await cache.get(cacheKey);
+  const needsRefresh = await cache.needsRefresh(cacheKey);
+  
   if (cached) {
+    // If data needs refresh, trigger background refresh (non-blocking)
+    if (needsRefresh) {
+      // Fire and forget - refresh in background
+      fetchData()
+        .then(freshData => cache.set(cacheKey, freshData, { 
+          ttl: 60, 
+          refreshInterval: 45 
+        }))
+        .catch(err => console.error('Background refresh failed:', err));
+    }
+    
     return NextResponse.json(cached);
   }
   
   // Fetch fresh data
   const data = await fetchData();
   
-  // Cache with custom TTL
-  await cache.set(cacheKey, data, { ttl: 60 });
+  // Cache with custom TTL and refresh interval
+  await cache.set(cacheKey, data, { 
+    ttl: 60,        // Cache for 60 seconds
+    refreshInterval: 45  // Refresh after 45 seconds
+  });
   
   return NextResponse.json(data);
 }
@@ -107,8 +133,17 @@ const cache = getCache();
 // Get from cache
 const value = await cache.get('my-key');
 
-// Set in cache
-await cache.set('my-key', { data: 'value' }, { ttl: 300 });
+// Set in cache with TTL and refresh interval
+await cache.set('my-key', { data: 'value' }, { 
+  ttl: 300,           // Cache for 5 minutes
+  refreshInterval: 240  // Refresh after 4 minutes
+});
+
+// Check if data needs refresh (stale-while-revalidate pattern)
+const needsRefresh = await cache.needsRefresh('my-key');
+if (needsRefresh) {
+  // Trigger background refresh
+}
 
 // Check if exists
 const exists = await cache.has('my-key');
@@ -235,14 +270,31 @@ await cache.delete('coin-data:bitcoin:usd');
 // Note: Pattern matching requires Redis SCAN command
 ```
 
+## Refresh Intervals Best Practices
+
+1. **Set refresh intervals shorter than TTL** - Typically 60-70% of TTL
+2. **Use refresh intervals for frequently accessed data** - Improves perceived performance
+3. **Background refreshes should be non-blocking** - Don't wait for refresh to complete
+4. **Handle refresh failures gracefully** - Cache will continue serving stale data until TTL expires
+5. **Adjust intervals based on data volatility** - More volatile data = shorter refresh intervals
+
 ## Best Practices
 
 1. **Always check cache first** before external API calls
-2. **Set appropriate TTLs** based on data freshness needs
+2. **Set appropriate TTLs and refresh intervals** based on data freshness needs
 3. **Use consistent cache keys** for the same data
 4. **Handle cache misses gracefully** (fallback to API)
 5. **Monitor cache performance** in production
 6. **Invalidate cache** when data is updated manually
+7. **Use refresh intervals** for stale-while-revalidate pattern
+
+## Refresh Interval Benefits
+
+1. **Improved User Experience**: Users always get fast responses from cache
+2. **Fresh Data**: Background refreshes keep data up-to-date
+3. **Reduced Latency**: No waiting for API calls on cache hits
+4. **Better Performance**: Stale-while-revalidate pattern optimizes both speed and freshness
+5. **Graceful Degradation**: If refresh fails, stale data is still served until TTL expires
 
 ## Future Enhancements
 
@@ -252,4 +304,5 @@ Potential improvements:
 - Pattern-based cache invalidation
 - Cache compression for large objects
 - Cache versioning for schema changes
+- Automatic refresh interval optimization based on access patterns
 

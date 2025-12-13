@@ -20,8 +20,33 @@ export async function GET(request: NextRequest) {
     const cache = getCache();
     const cachedRates = await cache.get(cacheKey);
     
+    // Check if data needs refresh (stale-while-revalidate pattern)
+    const needsRefresh = await cache.needsRefresh(cacheKey);
+    
     if (cachedRates) {
-      console.log('Cache hit for exchange rates:', baseCurrency);
+      console.log('Cache hit for exchange rates:', baseCurrency, needsRefresh ? '(needs refresh)' : '');
+      
+      // If data needs refresh, trigger background refresh (non-blocking)
+      if (needsRefresh) {
+        const requestKey = generateRequestKey('exchange-rates-fetch', { base: baseCurrency });
+        // Fire and forget - refresh in background
+        requestDeduplicator.deduplicate(
+          requestKey,
+          async () => {
+            try {
+              const freshRates = await fetchExchangeRates(baseCurrency);
+              const validatedRates = validateExchangeRates(freshRates);
+              await cache.set(cacheKey, validatedRates, { 
+                ttl: 900, // 15 minutes
+                refreshInterval: 600 // Refresh after 10 minutes
+              });
+            } catch (error) {
+              console.error('Background refresh failed for exchange rates:', error);
+            }
+          }
+        ).catch(err => console.error('Background refresh error:', err));
+      }
+      
       return NextResponse.json(cachedRates);
     }
 
@@ -37,8 +62,11 @@ export async function GET(request: NextRequest) {
     // Validate the exchange rates before sending (extra safety layer)
     const validatedExchangeRates = validateExchangeRates(exchangeRates);
     
-    // Cache exchange rates for 15 minutes (increased from 10 min - they change less frequently)
-    await cache.set(cacheKey, validatedExchangeRates, { ttl: 900 });
+    // Cache exchange rates for 15 minutes, refresh after 10 minutes
+    await cache.set(cacheKey, validatedExchangeRates, { 
+      ttl: 900, // 15 minutes
+      refreshInterval: 600 // Refresh after 10 minutes
+    });
     
     return NextResponse.json(validatedExchangeRates);
   } catch (error: any) {
