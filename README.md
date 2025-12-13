@@ -19,6 +19,7 @@ A real-time cryptocurrency tokenomics dashboard built with Next.js, TypeScript, 
 - **State Management**: Zustand
 - **API**: CoinGecko API
 - **Icons**: Lucide React
+- **Caching**: Redis (optional) with in-memory fallback
 
 ## Getting Started
 
@@ -44,7 +45,16 @@ A real-time cryptocurrency tokenomics dashboard built with Next.js, TypeScript, 
     yarn install
     ```
 
-3. Run the development server:
+3. (Optional) Set up Redis for caching:
+
+    The application supports both Redis and in-memory caching. Redis is optional but recommended for production.
+    
+    - **With Redis**: Set `REDIS_URL` environment variable (e.g., `redis://localhost:6379`)
+    - **Without Redis**: The app will automatically use in-memory caching
+    
+    See [Caching Documentation](./docs/CACHING.md) for more details.
+
+4. Run the development server:
 
     ```bash
     npm run dev
@@ -144,11 +154,26 @@ A real-time cryptocurrency tokenomics dashboard built with Next.js, TypeScript, 
 - **Railway**: Add `package.json` with build script
 - **Docker**: Use the included Dockerfile
 
+## Caching
+
+The application implements intelligent caching strategies to reduce API calls and improve performance:
+
+- **Redis Caching** (optional): Distributed caching for production environments
+- **In-Memory Caching**: Automatic fallback when Redis is unavailable
+- **Smart TTLs**: Different cache durations based on data freshness needs
+  - Coin data: 30 seconds (frequently changing)
+  - Historical data: 5 minutes (less volatile)
+  - Exchange rates: 10 minutes (relatively stable)
+  - Search results: 1-2 minutes
+
+See [Caching Documentation](./docs/CACHING.md) for detailed configuration.
+
 ## API Rate Limits
 
 The CoinGecko API has rate limits:
 
 - Free tier: 10-50 calls/minute
+- Caching helps reduce API calls significantly
 - Consider upgrading for production use
 
 ## Contributing

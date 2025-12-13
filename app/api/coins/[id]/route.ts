@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchCoinData, fetchPriceHistory, fetchOHLC } from '@/lib/api';
 import { validateMarketData } from '@/lib/validation/validators';
 import { sanitizeCoinId, sanitizeCurrency, sanitizeNumber, sanitizeDate } from '@/lib/utils/sanitize';
+import { getCache } from '@/lib/cache/cache';
+import { CacheManager } from '@/lib/cache/cache';
 
 export async function GET(
   request: NextRequest,
@@ -75,6 +77,27 @@ export async function GET(
       ohlcOptions.days = days;
     }
 
+    // Generate cache key
+    const cacheKey = CacheManager.generateCacheKey('coin-data', {
+      coinId,
+      currency,
+      chartType,
+      days: priceHistoryOptions.days,
+      from: fromParam,
+      to: toParam,
+    });
+
+    // Try to get from cache
+    const cache = getCache();
+    const cachedData = await cache.get(cacheKey);
+
+    if (cachedData) {
+      console.log('Cache hit for coin data:', coinId);
+      return NextResponse.json(cachedData);
+    }
+
+    console.log('Cache miss for coin data:', coinId, '- fetching from API');
+
     // Fetch data based on chart type
     const [coinData, priceHistory, ohlcData] = await Promise.all([
       fetchCoinData(coinId, currency),
@@ -102,6 +125,12 @@ export async function GET(
 
     // Validate the final market data before sending
     const validatedMarketData = validateMarketData(marketData);
+
+    // Cache the result with TTL based on data freshness needs
+    // Coin data changes frequently, so use shorter TTL (30 seconds)
+    // Historical data can be cached longer (5 minutes)
+    const ttl = fromParam && toParam ? 300 : 30; // 5 min for historical, 30s for current
+    await cache.set(cacheKey, validatedMarketData, { ttl });
 
     return NextResponse.json(validatedMarketData);
   } catch (error: any) {
