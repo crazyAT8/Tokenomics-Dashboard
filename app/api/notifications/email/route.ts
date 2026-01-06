@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { retry, RetryOptions } from '@/lib/utils/retry';
+import { 
+  createEmailRecord, 
+  updateEmailStatus, 
+  generateTrackingId 
+} from '@/lib/utils/emailTracking';
 
 /**
  * Email notification API route
@@ -31,6 +36,14 @@ interface EmailRequest {
   subject: string;
   body: string;
   html?: string;
+  trackingId?: string; // Optional: use existing tracking ID for retries
+}
+
+interface EmailSendResult {
+  success: boolean;
+  messageId?: string;
+  providerMessageId?: string;
+  error?: string;
 }
 
 /**
@@ -203,7 +216,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body: EmailRequest = await request.json();
-    const { to, subject, body: textBody, html } = body;
+    const { to, subject, body: textBody, html, trackingId } = body;
 
     // Validate email address
     if (!to || !to.includes('@')) {
@@ -213,20 +226,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if email service is configured
-    const emailService = process.env.EMAIL_SERVICE || 'smtp';
-    
-    let emailSent = false;
-    let error: string | null = null;
+    // Determine which email service to use
+    let emailService: 'resend' | 'sendgrid' | 'smtp' = 'smtp';
+    if (process.env.RESEND_API_KEY) {
+      emailService = 'resend';
+    } else if (process.env.SENDGRID_API_KEY) {
+      emailService = 'sendgrid';
+    } else if (
+      process.env.SMTP_HOST &&
+      process.env.SMTP_USER &&
+      process.env.SMTP_PASS
+    ) {
+      emailService = 'smtp';
+    }
+
+    // Create or get tracking record
+    let trackingRecord;
+    if (trackingId) {
+      // Use existing tracking record for retries
+      const { getEmailRecord } = await import('@/lib/utils/emailTracking');
+      trackingRecord = await getEmailRecord(trackingId);
+      if (!trackingRecord) {
+        return NextResponse.json(
+          { error: 'Invalid tracking ID' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Create new tracking record
+      trackingRecord = await createEmailRecord(to, subject, emailService);
+    }
+
+    let result: EmailSendResult = { success: false };
+    let error: string | undefined = undefined;
 
     try {
       // Try Resend first (recommended for production)
       if (process.env.RESEND_API_KEY) {
-        emailSent = await sendViaResend(to, subject, textBody, html);
+        result = await sendViaResend(to, subject, textBody, html, trackingRecord.id);
       }
       // Try SendGrid
       else if (process.env.SENDGRID_API_KEY) {
-        emailSent = await sendViaSendGrid(to, subject, textBody, html);
+        result = await sendViaSendGrid(to, subject, textBody, html, trackingRecord.id);
       }
       // Try SMTP
       else if (
@@ -234,7 +275,7 @@ export async function POST(request: NextRequest) {
         process.env.SMTP_USER &&
         process.env.SMTP_PASS
       ) {
-        emailSent = await sendViaSMTP(to, subject, textBody, html);
+        result = await sendViaSMTP(to, subject, textBody, html, trackingRecord.id);
       }
       else {
         // In development, just log the email
@@ -242,16 +283,35 @@ export async function POST(request: NextRequest) {
         console.log('To:', to);
         console.log('Subject:', subject);
         console.log('Body:', textBody);
-        emailSent = true; // Return success in dev mode
+        result = { success: true }; // Return success in dev mode
       }
     } catch (err: any) {
       error = err.message || 'Failed to send email';
       console.error('Email sending error:', err);
+      result = { success: false, error };
     }
 
-    if (!emailSent && error) {
+    // Update tracking record based on result
+    if (result.success) {
+      await updateEmailStatus(trackingRecord.id, 'sent', {
+        messageId: result.messageId,
+        providerMessageId: result.providerMessageId,
+      });
+    } else {
+      const retryCount = (trackingRecord.retryCount || 0) + 1;
+      await updateEmailStatus(trackingRecord.id, 'failed', {
+        error: result.error || error || 'Failed to send email',
+        retryCount,
+      });
+    }
+
+    if (!result.success && error) {
       return NextResponse.json(
-        { error: `Failed to send email: ${error}` },
+        { 
+          error: `Failed to send email: ${error}`,
+          trackingId: trackingRecord.id,
+          status: 'failed'
+        },
         { status: 500 }
       );
     }
@@ -259,7 +319,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       message: 'Email sent successfully',
-      service: emailService 
+      service: emailService,
+      trackingId: trackingRecord.id,
+      messageId: result.messageId,
+      status: 'sent'
     });
   } catch (error: any) {
     console.error('Email API error:', error);
@@ -411,8 +474,9 @@ async function sendViaResend(
   to: string,
   subject: string,
   text: string,
-  html?: string
-): Promise<boolean> {
+  html?: string,
+  trackingId?: string
+): Promise<EmailSendResult> {
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) {
     throw new Error('RESEND_API_KEY not configured');
@@ -420,32 +484,55 @@ async function sendViaResend(
 
   const retryConfig = getRetryConfig();
   
-  return retry(async () => {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+  try {
+    const result = await retry(async () => {
+      const emailPayload: any = {
         from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
         to: [to],
         subject,
         text,
         html: html || text.replace(/\n/g, '<br>'),
-      }),
-    });
+      };
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const error: any = new Error(errorData.message || `Resend API error: ${response.statusText}`);
-      error.status = response.status;
-      error.statusText = response.statusText;
-      throw normalizeErrorForRetry(error);
-    }
+      // Add tracking ID to headers for webhook matching
+      if (trackingId) {
+        emailPayload.headers = {
+          'X-Tracking-ID': trackingId,
+        };
+      }
 
-    return true;
-  }, retryConfig);
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const error: any = new Error(errorData.message || `Resend API error: ${response.statusText}`);
+        error.status = response.status;
+        error.statusText = response.statusText;
+        throw normalizeErrorForRetry(error);
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        messageId: data.id,
+        providerMessageId: data.id,
+      };
+    }, retryConfig);
+
+    return result as EmailSendResult;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to send email via Resend',
+    };
+  }
 }
 
 /**
@@ -455,8 +542,9 @@ async function sendViaSendGrid(
   to: string,
   subject: string,
   text: string,
-  html?: string
-): Promise<boolean> {
+  html?: string,
+  trackingId?: string
+): Promise<EmailSendResult> {
   const sendGridApiKey = process.env.SENDGRID_API_KEY;
   if (!sendGridApiKey) {
     throw new Error('SENDGRID_API_KEY not configured');
@@ -464,14 +552,9 @@ async function sendViaSendGrid(
 
   const retryConfig = getRetryConfig();
   
-  return retry(async () => {
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${sendGridApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+  try {
+    const result = await retry(async () => {
+      const emailPayload: any = {
         personalizations: [{ to: [{ email: to }] }],
         from: { email: process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com' },
         subject,
@@ -479,19 +562,49 @@ async function sendViaSendGrid(
           { type: 'text/plain', value: text },
           { type: 'text/html', value: html || text.replace(/\n/g, '<br>') },
         ],
-      }),
-    });
+      };
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      const error: any = new Error(`SendGrid API error: ${errorText}`);
-      error.status = response.status;
-      error.statusText = response.statusText;
-      throw normalizeErrorForRetry(error);
-    }
+      // Add tracking ID to custom headers for webhook matching
+      if (trackingId) {
+        emailPayload.custom_args = {
+          tracking_id: trackingId,
+        };
+      }
 
-    return true;
-  }, retryConfig);
+      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sendGridApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailPayload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const error: any = new Error(`SendGrid API error: ${errorText}`);
+        error.status = response.status;
+        error.statusText = response.statusText;
+        throw normalizeErrorForRetry(error);
+      }
+
+      // SendGrid returns message ID in X-Message-Id header
+      const messageId = response.headers.get('X-Message-Id') || undefined;
+      
+      return {
+        success: true,
+        messageId,
+        providerMessageId: messageId,
+      };
+    }, retryConfig);
+
+    return result as EmailSendResult;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to send email via SendGrid',
+    };
+  }
 }
 
 /**
@@ -512,8 +625,9 @@ async function sendViaSMTP(
   to: string,
   subject: string,
   text: string,
-  html?: string
-): Promise<boolean> {
+  html?: string,
+  trackingId?: string
+): Promise<EmailSendResult> {
   // Validate required environment variables
   const smtpHost = process.env.SMTP_HOST;
   const smtpUser = process.env.SMTP_USER;
@@ -570,9 +684,9 @@ async function sendViaSMTP(
   const retryConfig = getRetryConfig();
   
   try {
-    return await retry(async () => {
+    const result = await retry(async () => {
       try {
-        const info = await transporter.sendMail({
+        const mailOptions: any = {
           from,
           to,
           subject,
@@ -580,7 +694,16 @@ async function sendViaSMTP(
           html: htmlContent,
           // Add reply-to if configured
           ...(process.env.SMTP_REPLY_TO && { replyTo: process.env.SMTP_REPLY_TO }),
-        });
+        };
+
+        // Add tracking ID to headers for webhook matching (if supported by provider)
+        if (trackingId) {
+          mailOptions.headers = {
+            'X-Tracking-ID': trackingId,
+          };
+        }
+
+        const info = await transporter.sendMail(mailOptions);
 
         // Log success (messageId is available in info)
         console.log('Email sent successfully via SMTP:', {
@@ -589,16 +712,25 @@ async function sendViaSMTP(
           subject,
         });
 
-        return true;
+        return {
+          success: true,
+          messageId: info.messageId,
+          providerMessageId: info.messageId,
+        };
       } catch (error: any) {
         // Normalize error for retry detection
         throw normalizeErrorForRetry(error);
       }
     }, retryConfig);
+
+    return result as EmailSendResult;
   } catch (error: any) {
     // Provide more detailed error information
     const errorMessage = error.response || error.message || 'Unknown error';
-    throw new Error(`Failed to send email via SMTP: ${errorMessage}`);
+    return {
+      success: false,
+      error: `Failed to send email via SMTP: ${errorMessage}`,
+    };
   }
 }
 

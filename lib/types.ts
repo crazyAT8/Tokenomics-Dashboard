@@ -173,3 +173,33 @@ export interface PriceAlert {
   emailAddress?: string;
   browserNotification?: boolean;
 }
+
+export type EmailDeliveryStatus = 
+  | 'pending'      // Email queued but not yet sent
+  | 'sent'         // Email sent successfully
+  | 'delivered'    // Email delivered to recipient's mailbox
+  | 'opened'       // Email opened by recipient
+  | 'clicked'      // Link in email clicked
+  | 'bounced'      // Email bounced (permanent failure)
+  | 'failed'       // Email failed to send (temporary failure)
+  | 'complained'   // Recipient marked as spam
+  | 'unsubscribed'; // Recipient unsubscribed
+
+export interface EmailDeliveryRecord {
+  id: string;                    // Unique tracking ID
+  to: string;                    // Recipient email address
+  subject: string;               // Email subject
+  status: EmailDeliveryStatus;   // Current delivery status
+  service: 'resend' | 'sendgrid' | 'smtp'; // Email service used
+  messageId?: string;            // Provider's message ID (if available)
+  providerMessageId?: string;     // Provider-specific message ID
+  sentAt?: number;               // Timestamp when email was sent
+  deliveredAt?: number;          // Timestamp when email was delivered
+  openedAt?: number;              // Timestamp when email was opened
+  clickedAt?: number;             // Timestamp when link was clicked
+  error?: string;                 // Error message if status is 'failed' or 'bounced'
+  retryCount?: number;            // Number of retry attempts
+  createdAt: number;              // Timestamp when record was created
+  updatedAt: number;              // Timestamp when record was last updated
+  metadata?: Record<string, any>; // Additional metadata from provider
+}
