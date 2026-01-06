@@ -220,6 +220,75 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `CACHE_NAMESPACE` | Cache key namespace | `tokenomics` | No |
 | `COINGECKO_API_URL` | CoinGecko API base URL | `https://api.coingecko.com/api/v3` | No |
 
+### Email Notification Configuration
+
+The application supports multiple email providers with automatic fallback mechanisms:
+
+#### Primary Email Providers (choose one)
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `RESEND_API_KEY` | Resend API key (recommended for production) | No* |
+| `RESEND_FROM_EMAIL` | From email address for Resend | No |
+| `SENDGRID_API_KEY` | SendGrid API key | No* |
+| `SENDGRID_FROM_EMAIL` | From email address for SendGrid | No |
+| `SMTP_HOST` | SMTP server hostname (e.g., smtp.gmail.com) | No* |
+| `SMTP_PORT` | SMTP server port (587 for TLS, 465 for SSL) | No |
+| `SMTP_USER` | SMTP username/email | No* |
+| `SMTP_PASS` | SMTP password or app-specific password | No* |
+| `SMTP_SECURE` | Use SSL (true for port 465, false for STARTTLS) | No |
+| `SMTP_FROM` | From email address (defaults to SMTP_USER) | No |
+| `SMTP_NAME` | Display name for the sender | No |
+
+*At least one email provider must be configured.
+
+#### Email Retry Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `EMAIL_RETRY_MAX_ATTEMPTS` | Maximum number of retry attempts | `3` |
+| `EMAIL_RETRY_INITIAL_DELAY` | Initial delay in milliseconds before first retry | `1000` |
+| `EMAIL_RETRY_MAX_DELAY` | Maximum delay in milliseconds between retries | `10000` |
+
+#### Fallback Notification Configuration
+
+When email fails, the system automatically tries alternative notification methods:
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `ENABLE_FALLBACK_NOTIFICATIONS` | Enable fallback notifications (set to `false` to disable) | No (default: enabled) |
+| `FALLBACK_WEBHOOK_URL` | Webhook URL for fallback notifications (Slack, Discord, Teams, etc.) | No |
+| `FALLBACK_WEBHOOK_AUTH_HEADER` | Custom auth header name for webhook (e.g., `Authorization`) | No |
+| `FALLBACK_WEBHOOK_AUTH_TOKEN` | Auth token for webhook authentication | No |
+| `TWILIO_ACCOUNT_SID` | Twilio Account SID for SMS fallback | No |
+| `TWILIO_AUTH_TOKEN` | Twilio Auth Token for SMS fallback | No |
+| `TWILIO_PHONE_NUMBER` | Twilio phone number to send SMS from | No |
+| `NOTIFICATION_MAX_RETRIES` | Maximum retries for queued notifications | `5` |
+
+**Fallback Priority Order:**
+1. Alternative email providers (Resend → SendGrid → SMTP)
+2. Webhook notification (if configured)
+3. SMS notification (if Twilio configured and phone number provided)
+4. Queue for later retry (always attempted as last resort)
+
+**Example Configuration:**
+
+```env
+# Primary email provider
+RESEND_API_KEY=re_xxxxxxxxxxxxx
+RESEND_FROM_EMAIL=noreply@yourdomain.com
+
+# Fallback webhook (Slack example)
+FALLBACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+FALLBACK_WEBHOOK_AUTH_HEADER=Authorization
+FALLBACK_WEBHOOK_AUTH_TOKEN=Bearer xxxxxx
+
+# Optional SMS fallback (Twilio)
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_PHONE_NUMBER=+1234567890
+```
+
 ### Cache Configuration
 
 The application uses intelligent caching with different TTLs for different data types:

@@ -6,11 +6,13 @@ import {
   updateEmailStatus, 
   generateTrackingId 
 } from '@/lib/utils/emailTracking';
+import { executeFallbackNotifications } from '@/lib/utils/fallbackNotifications';
 
 /**
  * Email notification API route
  * 
- * This endpoint sends email notifications for price alerts with automatic retry logic.
+ * This endpoint sends email notifications for price alerts with automatic retry logic
+ * and fallback notification methods when email fails.
  * 
  * To use this, you'll need to configure one of the following:
  * 1. SMTP server (Gmail, Outlook, etc.) - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
@@ -29,6 +31,15 @@ import {
  * - Server errors (500, 502, 503, 504)
  * - Rate limit errors (429) with longer delays
  * - Request timeout errors (408)
+ * 
+ * Fallback Notifications:
+ * When email fails, the system automatically tries alternative notification methods:
+ * 1. Alternative email providers (if multiple are configured)
+ * 2. Webhook notification (if FALLBACK_WEBHOOK_URL is set)
+ * 3. SMS notification (if Twilio is configured and phone number provided)
+ * 4. Queue for later retry (always attempted as last resort)
+ * 
+ * Set ENABLE_FALLBACK_NOTIFICATIONS=false to disable fallback notifications.
  */
 
 interface EmailRequest {
@@ -259,15 +270,44 @@ export async function POST(request: NextRequest) {
 
     let result: EmailSendResult = { success: false };
     let error: string | undefined = undefined;
+    let fallbackResult: any = null;
 
     try {
       // Try Resend first (recommended for production)
       if (process.env.RESEND_API_KEY) {
         result = await sendViaResend(to, subject, textBody, html, trackingRecord.id);
+        if (!result.success) {
+          // Try fallback notifications
+          fallbackResult = await executeFallbackNotifications(
+            {
+              to,
+              subject,
+              body: textBody,
+              html,
+              metadata: { trackingId: trackingRecord.id, originalProvider: 'resend' },
+            },
+            result.error || 'Email sending failed',
+            'resend'
+          );
+        }
       }
       // Try SendGrid
       else if (process.env.SENDGRID_API_KEY) {
         result = await sendViaSendGrid(to, subject, textBody, html, trackingRecord.id);
+        if (!result.success) {
+          // Try fallback notifications
+          fallbackResult = await executeFallbackNotifications(
+            {
+              to,
+              subject,
+              body: textBody,
+              html,
+              metadata: { trackingId: trackingRecord.id, originalProvider: 'sendgrid' },
+            },
+            result.error || 'Email sending failed',
+            'sendgrid'
+          );
+        }
       }
       // Try SMTP
       else if (
@@ -276,6 +316,20 @@ export async function POST(request: NextRequest) {
         process.env.SMTP_PASS
       ) {
         result = await sendViaSMTP(to, subject, textBody, html, trackingRecord.id);
+        if (!result.success) {
+          // Try fallback notifications
+          fallbackResult = await executeFallbackNotifications(
+            {
+              to,
+              subject,
+              body: textBody,
+              html,
+              metadata: { trackingId: trackingRecord.id, originalProvider: 'smtp' },
+            },
+            result.error || 'Email sending failed',
+            'smtp'
+          );
+        }
       }
       else {
         // In development, just log the email
@@ -289,6 +343,23 @@ export async function POST(request: NextRequest) {
       error = err.message || 'Failed to send email';
       console.error('Email sending error:', err);
       result = { success: false, error };
+      
+      // Try fallback notifications on exception
+      try {
+        fallbackResult = await executeFallbackNotifications(
+          {
+            to,
+            subject,
+            body: textBody,
+            html,
+            metadata: { trackingId: trackingRecord.id, originalProvider: emailService },
+          },
+          error || 'Email sending failed',
+          emailService
+        );
+      } catch (fallbackErr: any) {
+        console.error('Fallback notification error:', fallbackErr);
+      }
     }
 
     // Update tracking record based on result
@@ -299,9 +370,31 @@ export async function POST(request: NextRequest) {
       });
     } else {
       const retryCount = (trackingRecord.retryCount || 0) + 1;
-      await updateEmailStatus(trackingRecord.id, 'failed', {
+      const finalStatus = fallbackResult?.success ? 'sent' : 'failed';
+      await updateEmailStatus(trackingRecord.id, finalStatus, {
         error: result.error || error || 'Failed to send email',
         retryCount,
+        fallbackMethod: fallbackResult?.finalResult?.method,
+        fallbackAttempted: fallbackResult?.methodsAttempted?.map((m: any) => m.method) || [],
+      });
+    }
+
+    // If email failed but fallback succeeded, return success with fallback info
+    if (!result.success && fallbackResult?.success) {
+      return NextResponse.json({
+        success: true,
+        message: 'Email failed but notification sent via fallback method',
+        service: emailService,
+        trackingId: trackingRecord.id,
+        status: 'sent',
+        fallback: {
+          method: fallbackResult.finalResult?.method,
+          methodsAttempted: fallbackResult.methodsAttempted?.map((m: any) => ({
+            method: m.method,
+            success: m.success,
+            error: m.error,
+          })),
+        },
       });
     }
 
@@ -310,7 +403,16 @@ export async function POST(request: NextRequest) {
         { 
           error: `Failed to send email: ${error}`,
           trackingId: trackingRecord.id,
-          status: 'failed'
+          status: 'failed',
+          fallback: fallbackResult ? {
+            attempted: true,
+            success: fallbackResult.success,
+            methodsAttempted: fallbackResult.methodsAttempted?.map((m: any) => ({
+              method: m.method,
+              success: m.success,
+              error: m.error,
+            })),
+          } : null,
         },
         { status: 500 }
       );
