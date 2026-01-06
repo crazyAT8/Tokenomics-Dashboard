@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import nodemailer from 'nodemailer';
 
 /**
  * Email notification API route
@@ -167,8 +168,18 @@ async function sendViaSendGrid(
 }
 
 /**
- * Send email via SMTP (using nodemailer would require installing it)
- * For now, this is a placeholder - you can install nodemailer if needed
+ * Send email via SMTP using nodemailer
+ * 
+ * Required environment variables:
+ * - SMTP_HOST: SMTP server hostname (e.g., smtp.gmail.com)
+ * - SMTP_PORT: SMTP server port (e.g., 587 for TLS, 465 for SSL)
+ * - SMTP_USER: SMTP username/email
+ * - SMTP_PASS: SMTP password or app-specific password
+ * 
+ * Optional environment variables:
+ * - SMTP_SECURE: Set to 'true' for SSL (port 465), 'false' for STARTTLS (port 587)
+ * - SMTP_FROM: From email address (defaults to SMTP_USER)
+ * - SMTP_NAME: Display name for the sender
  */
 async function sendViaSMTP(
   to: string,
@@ -176,38 +187,82 @@ async function sendViaSMTP(
   text: string,
   html?: string
 ): Promise<boolean> {
-  // Note: To use SMTP, you would need to install nodemailer:
-  // npm install nodemailer
-  // Then uncomment and configure the code below
-  
-  throw new Error(
-    'SMTP email sending requires nodemailer package. ' +
-    'Install it with: npm install nodemailer, or use Resend/SendGrid instead.'
-  );
+  // Validate required environment variables
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
 
-  /* 
-  // Example implementation with nodemailer:
-  const nodemailer = require('nodemailer');
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    throw new Error(
+      'SMTP configuration incomplete. Required: SMTP_HOST, SMTP_USER, SMTP_PASS'
+    );
+  }
+
+  // Parse port (default: 587 for STARTTLS)
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  if (isNaN(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid SMTP_PORT: ${process.env.SMTP_PORT}. Must be between 1 and 65535.`);
+  }
+
+  // Determine secure mode
+  // Port 465 typically uses SSL, port 587 uses STARTTLS
+  const secure = process.env.SMTP_SECURE === 'true' || port === 465;
   
+  // Create transporter
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
+    host: smtpHost,
+    port,
+    secure,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user: smtpUser,
+      pass: smtpPass,
+    },
+    // Additional options for better compatibility
+    tls: {
+      // Do not fail on invalid certificates (useful for self-signed certs in dev)
+      rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
     },
   });
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
-    to,
-    subject,
-    text,
-    html: html || text.replace(/\n/g, '<br>'),
-  });
+  // Verify connection
+  try {
+    await transporter.verify();
+  } catch (error: any) {
+    throw new Error(`SMTP connection verification failed: ${error.message}`);
+  }
 
-  return true;
-  */
+  // Prepare email options
+  const fromEmail = process.env.SMTP_FROM || smtpUser;
+  const fromName = process.env.SMTP_NAME;
+  const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+
+  // Generate HTML if not provided
+  const htmlContent = html || text.replace(/\n/g, '<br>');
+
+  // Send email
+  try {
+    const info = await transporter.sendMail({
+      from,
+      to,
+      subject,
+      text,
+      html: htmlContent,
+      // Add reply-to if configured
+      ...(process.env.SMTP_REPLY_TO && { replyTo: process.env.SMTP_REPLY_TO }),
+    });
+
+    // Log success (messageId is available in info)
+    console.log('Email sent successfully via SMTP:', {
+      messageId: info.messageId,
+      to,
+      subject,
+    });
+
+    return true;
+  } catch (error: any) {
+    // Provide more detailed error information
+    const errorMessage = error.response || error.message || 'Unknown error';
+    throw new Error(`Failed to send email via SMTP: ${errorMessage}`);
+  }
 }
 
