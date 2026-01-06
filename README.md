@@ -28,6 +28,7 @@ A comprehensive, real-time cryptocurrency tokenomics dashboard built with Next.j
 ## Features
 
 ### 📊 **Data Visualization**
+
 - **Interactive Price Charts**: Line and candlestick chart types with customizable time ranges
 - **Technical Indicators**: SMA (20, 50, 200), EMA (20, 50), RSI, MACD, Bollinger Bands, Support/Resistance levels
 - **Tokenomics Charts**: Visual supply distribution with pie charts
@@ -35,6 +36,7 @@ A comprehensive, real-time cryptocurrency tokenomics dashboard built with Next.j
 - **Multiple Time Ranges**: 1h, 24h, 7d, 30d, 90d, 180d, 1y, all-time
 
 ### 💰 **Portfolio Management**
+
 - **Portfolio Tracker**: Add coins with quantities and purchase prices
 - **Transaction History**: Track buy/sell transactions with fees and notes
 - **Portfolio Performance**: Real-time profit/loss calculations and performance metrics
@@ -42,12 +44,14 @@ A comprehensive, real-time cryptocurrency tokenomics dashboard built with Next.j
 - **Contributions Tracking**: Track deposits and withdrawals
 
 ### ⭐ **Favorites & Watchlist**
+
 - **Quick Access**: Star coins for easy access
 - **Sticky Watchlist**: Always-visible favorites bar
 - **Auto-refresh**: Automatic updates every 2 minutes for favorite coins
 - **Persistent Storage**: Favorites saved in browser localStorage
 
 ### 🔔 **Price Alerts**
+
 - **Custom Alerts**: Set price alerts above or below target prices
 - **Multi-currency Support**: Alerts work with all supported currencies
 - **Browser Notifications**: Native browser notifications when alerts trigger
@@ -55,18 +59,21 @@ A comprehensive, real-time cryptocurrency tokenomics dashboard built with Next.j
 - **Alert Management**: Enable/disable, edit, and delete alerts
 
 ### 💱 **Multi-Currency Support**
+
 - **10 Currencies**: USD, EUR, GBP, JPY, CAD, AUD, CHF, CNY, INR, KRW
 - **Real-time Exchange Rates**: Live currency conversion rates
 - **Currency Selector**: Easy switching between currencies
 - **Currency Rates Display**: View exchange rates for all supported currencies
 
 ### 📤 **Data Export**
+
 - **CSV Export**: Export price history and OHLC data
 - **PDF Reports**: Generate comprehensive PDF reports with charts and metrics
 - **Image Export**: Export charts as PNG images
 - **Formatted Data**: Properly formatted exports with metadata
 
 ### 🎨 **User Experience**
+
 - **Dark/Light Theme**: Toggle between themes with persistent preference
 - **Responsive Design**: Fully responsive for desktop, tablet, and mobile
 - **Network Status**: Real-time network connectivity monitoring
@@ -75,12 +82,14 @@ A comprehensive, real-time cryptocurrency tokenomics dashboard built with Next.j
 - **Offline Support**: Graceful degradation when offline
 
 ### ⚡ **Performance**
+
 - **Intelligent Caching**: Redis and in-memory caching with stale-while-revalidate pattern
 - **Request Deduplication**: Prevents duplicate API calls
 - **Optimized Rendering**: Efficient React rendering with proper memoization
 - **Background Refresh**: Non-blocking background data updates
 
 ### 🔍 **Search & Discovery**
+
 - **Coin Search**: Search through thousands of cryptocurrencies
 - **Quick Selection**: Fast coin switching with search autocomplete
 - **Coin Details**: Comprehensive coin information display
@@ -88,6 +97,7 @@ A comprehensive, real-time cryptocurrency tokenomics dashboard built with Next.j
 ## Tech Stack
 
 ### Frontend
+
 - **Framework**: [Next.js 14.2.5](https://nextjs.org/) (App Router)
 - **Language**: [TypeScript 5.3.3](https://www.typescriptlang.org/)
 - **UI Library**: [React 18.2.0](https://react.dev/)
@@ -97,31 +107,38 @@ A comprehensive, real-time cryptocurrency tokenomics dashboard built with Next.j
 - **Icons**: [Lucide React 0.294.0](https://lucide.dev/)
 
 ### State Management
+
 - **Global State**: [Zustand 4.4.7](https://zustand-demo.pmnd.rs/)
 - **Persistence**: Zustand persist middleware (localStorage)
 
 ### Backend & APIs
+
 - **API Routes**: Next.js API Routes
 - **Data Source**: [CoinGecko API](https://www.coingecko.com/en/api)
 - **HTTP Client**: [Axios 1.6.2](https://axios-http.com/)
 
 ### Caching
+
 - **Redis**: [Redis 4.6.12](https://redis.io/) (optional, recommended for production)
 - **In-Memory**: Automatic fallback when Redis unavailable
 
 ### Data Export
+
 - **PDF Generation**: [jsPDF 2.5.2](https://github.com/parallax/jsPDF) + [jsPDF-AutoTable 3.8.4](https://github.com/simonbengtsson/jsPDF-AutoTable)
 - **Image Export**: [html2canvas 1.4.1](https://html2canvas.hertzen.com/)
 
 ### Utilities
+
 - **Validation**: [Zod 4.1.13](https://zod.dev/)
 - **Class Utilities**: [clsx 2.0.0](https://github.com/lukeed/clsx) + [class-variance-authority 0.7.0](https://cva.style/)
 
 ### Testing
+
 - **Unit/Integration**: [Jest 29.7.0](https://jestjs.io/) + [React Testing Library 14.3.1](https://testing-library.com/react)
 - **E2E Testing**: [Playwright 1.57.0](https://playwright.dev/)
 
 ### Development Tools
+
 - **Linting**: [ESLint 8.56.0](https://eslint.org/) + Next.js config
 - **Build Tool**: Next.js built-in bundler
 
@@ -387,11 +404,13 @@ Export data in multiple formats:
 Get coin data including price history and tokenomics.
 
 **Parameters:**
+
 - `id` (path): Coin ID (e.g., "bitcoin")
 - `currency` (query): Currency code (default: "usd")
 - `days` (query): Number of days for price history (default: 7)
 
 **Response:**
+
 ```json
 {
   "coin": { /* CoinData */ },
@@ -406,11 +425,13 @@ Get coin data including price history and tokenomics.
 Search for coins or get coin data by IDs.
 
 **Query Parameters:**
+
 - `query` (optional): Search query string
 - `ids` (optional): Comma-separated coin IDs
 - `limit` (optional): Maximum results (default: 50)
 
 **Response:**
+
 ```json
 [ /* CoinData[] */ ]
 ```
@@ -420,9 +441,11 @@ Search for coins or get coin data by IDs.
 Get exchange rates for supported currencies.
 
 **Query Parameters:**
+
 - `base` (optional): Base currency (default: "usd")
 
 **Response:**
+
 ```json
 {
   "base": "usd",
@@ -436,6 +459,7 @@ Get exchange rates for supported currencies.
 Health check endpoint.
 
 **Response:**
+
 ```json
 {
   "status": "ok",
@@ -504,6 +528,7 @@ See [E2E Tests README](./e2e/README.md) for more information.
 ### Development Workflow
 
 1. **Create a feature branch**:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -511,12 +536,14 @@ See [E2E Tests README](./e2e/README.md) for more information.
 2. **Make your changes** and test locally
 
 3. **Run tests**:
+
    ```bash
    npm test
    npm run test:e2e
    ```
 
 4. **Commit your changes**:
+
    ```bash
    git commit -m "Add: your feature description"
    ```
@@ -541,6 +568,7 @@ See [E2E Tests README](./e2e/README.md) for more information.
 4. Deploy automatically on push
 
 **Environment Variables for Vercel:**
+
 - `REDIS_URL` (if using Redis)
 - `CACHE_DEFAULT_TTL` (optional)
 - `CACHE_NAMESPACE` (optional)
@@ -585,6 +613,7 @@ CMD ["npm", "start"]
 ```
 
 Build and run:
+
 ```bash
 docker build -t tokenomics-dashboard .
 docker run -p 3000:3000 tokenomics-dashboard
@@ -629,11 +658,13 @@ Contributions are welcome! Please follow these guidelines:
    - Add tests for new features
    - Update documentation if needed
 4. **Test your changes**:
+
    ```bash
    npm test
    npm run test:e2e
    npm run lint
    ```
+
 5. **Commit your changes**: `git commit -m "Add: amazing feature"`
 6. **Push to your branch**: `git push origin feature/amazing-feature`
 7. **Open a Pull Request**
@@ -667,6 +698,7 @@ When reporting issues, please include:
 **Problem**: Redis connection fails
 
 **Solutions**:
+
 - Check `REDIS_URL` format
 - Verify Redis server is running
 - Check network/firewall settings
@@ -677,6 +709,7 @@ When reporting issues, please include:
 **Problem**: Data not being cached
 
 **Solutions**:
+
 - Check environment variables
 - Verify cache keys are consistent
 - Check TTL values (might be too short)
@@ -687,6 +720,7 @@ When reporting issues, please include:
 **Problem**: Rate limit errors from CoinGecko API
 
 **Solutions**:
+
 - Ensure caching is enabled
 - Reduce request frequency
 - Consider upgrading CoinGecko API plan
@@ -697,6 +731,7 @@ When reporting issues, please include:
 **Problem**: Build fails
 
 **Solutions**:
+
 - Clear `.next` directory: `rm -rf .next`
 - Clear `node_modules`: `rm -rf node_modules && npm install`
 - Check Node.js version (requires 18+)
