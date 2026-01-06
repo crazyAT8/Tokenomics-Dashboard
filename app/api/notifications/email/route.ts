@@ -21,6 +21,98 @@ interface EmailRequest {
   html?: string;
 }
 
+/**
+ * Health check endpoint for email service
+ * Checks connectivity and authentication for all configured email services
+ */
+export async function GET() {
+  const healthStatus = {
+    status: 'ok' as 'ok' | 'degraded' | 'error',
+    timestamp: new Date().toISOString(),
+    services: {
+      resend: { configured: false, healthy: false, error: null as string | null },
+      sendgrid: { configured: false, healthy: false, error: null as string | null },
+      smtp: { configured: false, healthy: false, error: null as string | null },
+    },
+    configuredServices: [] as string[],
+    healthyServices: [] as string[],
+  };
+
+  // Check Resend
+  if (process.env.RESEND_API_KEY) {
+    healthStatus.services.resend.configured = true;
+    healthStatus.configuredServices.push('resend');
+    try {
+      await checkResendHealth();
+      healthStatus.services.resend.healthy = true;
+      healthStatus.healthyServices.push('resend');
+    } catch (error: any) {
+      healthStatus.services.resend.error = error.message || 'Health check failed';
+      healthStatus.status = 'degraded';
+    }
+  }
+
+  // Check SendGrid
+  if (process.env.SENDGRID_API_KEY) {
+    healthStatus.services.sendgrid.configured = true;
+    healthStatus.configuredServices.push('sendgrid');
+    try {
+      await checkSendGridHealth();
+      healthStatus.services.sendgrid.healthy = true;
+      healthStatus.healthyServices.push('sendgrid');
+    } catch (error: any) {
+      healthStatus.services.sendgrid.error = error.message || 'Health check failed';
+      healthStatus.status = 'degraded';
+    }
+  }
+
+  // Check SMTP
+  if (
+    process.env.SMTP_HOST &&
+    process.env.SMTP_USER &&
+    process.env.SMTP_PASS
+  ) {
+    healthStatus.services.smtp.configured = true;
+    healthStatus.configuredServices.push('smtp');
+    try {
+      await checkSMTPHealth();
+      healthStatus.services.smtp.healthy = true;
+      healthStatus.healthyServices.push('smtp');
+    } catch (error: any) {
+      healthStatus.services.smtp.error = error.message || 'Health check failed';
+      healthStatus.status = 'degraded';
+    }
+  }
+
+  // If no services are configured, return error status
+  if (healthStatus.configuredServices.length === 0) {
+    healthStatus.status = 'error';
+    return NextResponse.json(
+      {
+        ...healthStatus,
+        message: 'No email service configured. Please configure at least one email service.',
+      },
+      { status: 503 }
+    );
+  }
+
+  // If no services are healthy, return error status
+  if (healthStatus.healthyServices.length === 0) {
+    healthStatus.status = 'error';
+    return NextResponse.json(
+      {
+        ...healthStatus,
+        message: 'All configured email services are unhealthy.',
+      },
+      { status: 503 }
+    );
+  }
+
+  // Return appropriate status code based on health
+  const statusCode = healthStatus.status === 'ok' ? 200 : 200; // Return 200 even for degraded, but status field indicates issue
+  return NextResponse.json(healthStatus, { status: statusCode });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: EmailRequest = await request.json();
@@ -88,6 +180,140 @@ export async function POST(request: NextRequest) {
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Health check for Resend API
+ */
+async function checkResendHealth(): Promise<void> {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    throw new Error('RESEND_API_KEY not configured');
+  }
+
+  // Verify API key by checking domains (lightweight endpoint)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+  try {
+    const response = await fetch('https://api.resend.com/domains', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Invalid API key or insufficient permissions');
+      }
+      const error = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(`Resend API error: ${error.message || response.statusText}`);
+    }
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Resend API health check timed out');
+    }
+    throw error;
+  }
+}
+
+/**
+ * Health check for SendGrid API
+ */
+async function checkSendGridHealth(): Promise<void> {
+  const sendGridApiKey = process.env.SENDGRID_API_KEY;
+  if (!sendGridApiKey) {
+    throw new Error('SENDGRID_API_KEY not configured');
+  }
+
+  // Verify API key by checking user profile (lightweight endpoint)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+  try {
+    const response = await fetch('https://api.sendgrid.com/v3/user/profile', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${sendGridApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Invalid API key or insufficient permissions');
+      }
+      const error = await response.text();
+      throw new Error(`SendGrid API error: ${error}`);
+    }
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('SendGrid API health check timed out');
+    }
+    throw error;
+  }
+}
+
+/**
+ * Health check for SMTP service
+ */
+async function checkSMTPHealth(): Promise<void> {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    throw new Error('SMTP configuration incomplete');
+  }
+
+  // Parse port
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  if (isNaN(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid SMTP_PORT: ${process.env.SMTP_PORT}`);
+  }
+
+  // Determine secure mode
+  const secure = process.env.SMTP_SECURE === 'true' || port === 465;
+
+  // Create transporter
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port,
+    secure,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+    tls: {
+      rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
+    },
+  });
+
+  // Verify connection (this tests authentication)
+  // Add timeout to prevent hanging
+  const verifyPromise = transporter.verify();
+  const timeoutPromise = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('SMTP health check timed out')), 10000)
+  );
+
+  try {
+    await Promise.race([verifyPromise, timeoutPromise]);
+  } catch (error: any) {
+    throw new Error(`SMTP connection verification failed: ${error.message}`);
+  } finally {
+    // Close the connection
+    transporter.close();
   }
 }
 
