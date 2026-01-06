@@ -29,8 +29,9 @@ function isRetryableError(error: any, options: Required<RetryOptions>): boolean 
     return true;
   }
 
-  // Check for HTTP status codes
-  if (error.response?.status && options.retryableStatuses.includes(error.response.status)) {
+  // Check for HTTP status codes (support both error.response.status and error.status)
+  const statusCode = error.response?.status || error.status;
+  if (statusCode && options.retryableStatuses.includes(statusCode)) {
     return true;
   }
 
@@ -39,9 +40,9 @@ function isRetryableError(error: any, options: Required<RetryOptions>): boolean 
     return true;
   }
 
-  // Don't retry client errors (4xx) except for specific ones
-  if (error.response?.status >= 400 && error.response?.status < 500) {
-    return options.retryableStatuses.includes(error.response.status);
+  // Don't retry client errors (4xx) except for specific ones in retryableStatuses
+  if (statusCode >= 400 && statusCode < 500) {
+    return options.retryableStatuses.includes(statusCode);
   }
 
   return false;
@@ -85,21 +86,18 @@ export async function retry<T>(
     } catch (error: any) {
       lastError = error;
       
-      const isRateLimit = error.response?.status === 429;
+      const isRateLimit = error.response?.status === 429 || error.status === 429;
       
-      // For rate limit errors, don't retry - just throw immediately
-      // Rate limits need user intervention or longer waits
-      if (isRateLimit) {
-        throw error;
-      }
-
+      // Check if error is retryable
+      const shouldRetry = isRetryableError(error, opts);
+      
       // Don't retry if it's the last attempt or error is not retryable
-      if (attempt === opts.maxRetries || !isRetryableError(error, opts)) {
+      if (attempt === opts.maxRetries || !shouldRetry) {
         throw error;
       }
 
-      // Calculate delay and wait before retrying
-      const delay = calculateDelay(attempt, opts, false);
+      // Calculate delay - use longer delays for rate limit errors
+      const delay = calculateDelay(attempt, opts, isRateLimit && shouldRetry);
       console.log(
         `Retry attempt ${attempt + 1}/${opts.maxRetries} after ${delay}ms delay. Error:`,
         error.message || error

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import { retry, RetryOptions } from '@/lib/utils/retry';
 
 /**
  * Email notification API route
  * 
- * This endpoint sends email notifications for price alerts.
+ * This endpoint sends email notifications for price alerts with automatic retry logic.
  * 
  * To use this, you'll need to configure one of the following:
  * 1. SMTP server (Gmail, Outlook, etc.) - set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
@@ -12,6 +13,17 @@ import nodemailer from 'nodemailer';
  * 3. SendGrid API - set SENDGRID_API_KEY
  * 
  * For production, consider using a service like Resend, SendGrid, or AWS SES.
+ * 
+ * Retry Configuration (Optional):
+ * - EMAIL_RETRY_MAX_ATTEMPTS: Maximum number of retry attempts (default: 3)
+ * - EMAIL_RETRY_INITIAL_DELAY: Initial delay in milliseconds before first retry (default: 1000)
+ * - EMAIL_RETRY_MAX_DELAY: Maximum delay in milliseconds between retries (default: 10000)
+ * 
+ * The retry logic uses exponential backoff and automatically retries on:
+ * - Network errors (timeouts, connection refused, etc.)
+ * - Server errors (500, 502, 503, 504)
+ * - Rate limit errors (429) with longer delays
+ * - Request timeout errors (408)
  */
 
 interface EmailRequest {
@@ -19,6 +31,81 @@ interface EmailRequest {
   subject: string;
   body: string;
   html?: string;
+}
+
+/**
+ * Get retry configuration from environment variables
+ */
+function getRetryConfig(): RetryOptions {
+  return {
+    maxRetries: parseInt(process.env.EMAIL_RETRY_MAX_ATTEMPTS || '3', 10),
+    initialDelay: parseInt(process.env.EMAIL_RETRY_INITIAL_DELAY || '1000', 10),
+    maxDelay: parseInt(process.env.EMAIL_RETRY_MAX_DELAY || '10000', 10),
+    retryableStatuses: [408, 429, 500, 502, 503, 504], // Include 429 for rate limits
+    retryableErrors: ['ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNRESET', 'ECONNREFUSED'],
+  };
+}
+
+/**
+ * Normalize error for retry detection
+ * Converts various error formats to a consistent structure
+ */
+function normalizeErrorForRetry(error: any): any {
+  // If error already has response structure, return as is
+  if (error.response) {
+    return error;
+  }
+
+  // Check if it's a fetch Response error
+  if (error.status) {
+    return {
+      ...error,
+      response: {
+        status: error.status,
+        statusText: error.statusText,
+      },
+    };
+  }
+
+  // Check for HTTP status codes in error message
+  const statusMatch = error.message?.match(/(\d{3})/);
+  if (statusMatch) {
+    const status = parseInt(statusMatch[1], 10);
+    if (status >= 400) {
+      return {
+        ...error,
+        response: {
+          status,
+        },
+      };
+    }
+  }
+
+  // Check for timeout errors
+  if (
+    error.message?.includes('timeout') ||
+    error.message?.includes('TIMEOUT') ||
+    error.message?.includes('timed out')
+  ) {
+    return {
+      ...error,
+      code: 'ETIMEDOUT',
+    };
+  }
+
+  // Check for connection errors
+  if (
+    error.message?.includes('ECONNREFUSED') ||
+    error.message?.includes('ECONNRESET') ||
+    error.message?.includes('ENOTFOUND')
+  ) {
+    return {
+      ...error,
+      code: error.message.match(/E[A-Z]+/)?.[0] || 'ECONNREFUSED',
+    };
+  }
+
+  return error;
 }
 
 /**
@@ -318,7 +405,7 @@ async function checkSMTPHealth(): Promise<void> {
 }
 
 /**
- * Send email via Resend API
+ * Send email via Resend API with retry logic
  */
 async function sendViaResend(
   to: string,
@@ -331,31 +418,38 @@ async function sendViaResend(
     throw new Error('RESEND_API_KEY not configured');
   }
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
-      to: [to],
-      subject,
-      text,
-      html: html || text.replace(/\n/g, '<br>'),
-    }),
-  });
+  const retryConfig = getRetryConfig();
+  
+  return retry(async () => {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+        to: [to],
+        subject,
+        text,
+        html: html || text.replace(/\n/g, '<br>'),
+      }),
+    });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || `Resend API error: ${response.statusText}`);
-  }
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error: any = new Error(errorData.message || `Resend API error: ${response.statusText}`);
+      error.status = response.status;
+      error.statusText = response.statusText;
+      throw normalizeErrorForRetry(error);
+    }
 
-  return true;
+    return true;
+  }, retryConfig);
 }
 
 /**
- * Send email via SendGrid API
+ * Send email via SendGrid API with retry logic
  */
 async function sendViaSendGrid(
   to: string,
@@ -368,29 +462,36 @@ async function sendViaSendGrid(
     throw new Error('SENDGRID_API_KEY not configured');
   }
 
-  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${sendGridApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      personalizations: [{ to: [{ email: to }] }],
-      from: { email: process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com' },
-      subject,
-      content: [
-        { type: 'text/plain', value: text },
-        { type: 'text/html', value: html || text.replace(/\n/g, '<br>') },
-      ],
-    }),
-  });
+  const retryConfig = getRetryConfig();
+  
+  return retry(async () => {
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${sendGridApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: to }] }],
+        from: { email: process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com' },
+        subject,
+        content: [
+          { type: 'text/plain', value: text },
+          { type: 'text/html', value: html || text.replace(/\n/g, '<br>') },
+        ],
+      }),
+    });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`SendGrid API error: ${error}`);
-  }
+    if (!response.ok) {
+      const errorText = await response.text();
+      const error: any = new Error(`SendGrid API error: ${errorText}`);
+      error.status = response.status;
+      error.statusText = response.statusText;
+      throw normalizeErrorForRetry(error);
+    }
 
-  return true;
+    return true;
+  }, retryConfig);
 }
 
 /**
@@ -465,26 +566,35 @@ async function sendViaSMTP(
   // Generate HTML if not provided
   const htmlContent = html || text.replace(/\n/g, '<br>');
 
-  // Send email
+  // Send email with retry logic
+  const retryConfig = getRetryConfig();
+  
   try {
-    const info = await transporter.sendMail({
-      from,
-      to,
-      subject,
-      text,
-      html: htmlContent,
-      // Add reply-to if configured
-      ...(process.env.SMTP_REPLY_TO && { replyTo: process.env.SMTP_REPLY_TO }),
-    });
+    return await retry(async () => {
+      try {
+        const info = await transporter.sendMail({
+          from,
+          to,
+          subject,
+          text,
+          html: htmlContent,
+          // Add reply-to if configured
+          ...(process.env.SMTP_REPLY_TO && { replyTo: process.env.SMTP_REPLY_TO }),
+        });
 
-    // Log success (messageId is available in info)
-    console.log('Email sent successfully via SMTP:', {
-      messageId: info.messageId,
-      to,
-      subject,
-    });
+        // Log success (messageId is available in info)
+        console.log('Email sent successfully via SMTP:', {
+          messageId: info.messageId,
+          to,
+          subject,
+        });
 
-    return true;
+        return true;
+      } catch (error: any) {
+        // Normalize error for retry detection
+        throw normalizeErrorForRetry(error);
+      }
+    }, retryConfig);
   } catch (error: any) {
     // Provide more detailed error information
     const errorMessage = error.response || error.message || 'Unknown error';
