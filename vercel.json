@@ -4,6 +4,11 @@
       "path": "/api/cron/price-alerts",
       "schedule": "*/1 * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/cron/**/*.ts": {
+      "maxDuration": 60
+    }
+  }
 }
 

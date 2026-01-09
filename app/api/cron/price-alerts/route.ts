@@ -1,82 +1,53 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { priceAlertWorker } from '@/lib/workers/priceAlertWorker';
+import { createCronHandler } from '@/lib/utils/cronRunner';
 
 /**
  * Cron Job Endpoint for Price Alert Monitoring
  * 
- * This endpoint should be called periodically (e.g., every minute) to check
+ * This endpoint is called periodically (every minute) to check
  * price alerts and trigger notifications when conditions are met.
  * 
+ * Configuration:
+ * - Schedule: Defined in vercel.json and lib/utils/cronRegistry.ts
+ * - Authentication: Validated via cronAuth utility
+ * - Timeout: 60 seconds (configurable in cronRegistry)
+ * 
  * For Vercel deployment:
- * - Configure in vercel.json with cron schedule
- * - Or use Vercel Cron Jobs dashboard
+ * - Automatically triggered by Vercel Cron (configured in vercel.json)
  * 
  * For other platforms:
  * - Use external cron service (e.g., cron-job.org, EasyCron)
- * - Or set up a scheduled task that calls this endpoint
+ * - Set Authorization header: Bearer {CRON_SECRET}
  * 
- * Security:
- * - This endpoint should be protected with a secret token
- * - Set CRON_SECRET environment variable and verify it in the request
- * 
- * Example cron schedule: */1 * * * * (every minute)
+ * For local development:
+ * - Use the dev cron script: npm run dev:cron
+ * - Or manually call: GET/POST http://localhost:3000/api/cron/price-alerts
  */
-export async function GET(request: NextRequest) {
-  try {
-    // Verify cron secret for security
-    const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
-    
-    // If CRON_SECRET is set, require authentication
-    if (cronSecret) {
-      const expectedAuth = `Bearer ${cronSecret}`;
-      if (authHeader !== expectedAuth) {
-        // Also check for Vercel Cron header
-        const cronHeader = request.headers.get('x-vercel-cron');
-        if (!cronHeader) {
-          return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 401 }
-          );
-        }
-      }
-    }
-
-    // Check if worker is enabled
-    if (process.env.ENABLE_PRICE_ALERT_WORKER === 'false') {
-      return NextResponse.json({
-        success: true,
-        message: 'Price alert worker is disabled',
-        stats: null,
-      });
-    }
-
-    console.log('⏰ Cron job triggered: Price alert monitoring');
-
-    // Process alerts
-    const stats = await priceAlertWorker.processAlerts();
-
-    return NextResponse.json({
-      success: true,
-      message: 'Price alert monitoring completed',
-      stats,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    console.error('Error in price alert cron job:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Internal server error',
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 }
-    );
+const handler = createCronHandler('price-alerts', async () => {
+  // Check if worker is enabled
+  if (process.env.ENABLE_PRICE_ALERT_WORKER === 'false') {
+    return {
+      message: 'Price alert worker is disabled',
+      stats: null,
+    };
   }
+
+  // Process alerts
+  const stats = await priceAlertWorker.processAlerts();
+
+  return {
+    message: 'Price alert monitoring completed',
+    stats,
+  };
+});
+
+export async function GET(request: NextRequest) {
+  return handler(request);
 }
 
 // Also support POST for external cron services
 export async function POST(request: NextRequest) {
-  return GET(request);
+  return handler(request);
 }
 
