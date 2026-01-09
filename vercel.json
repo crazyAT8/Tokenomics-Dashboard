@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/price-alerts",
+      "schedule": "*/1 * * * *"
+    }
+  ]
+}
+
