@@ -35,6 +35,27 @@ function prismaToPriceAlert(prismaAlert: any): PriceAlert {
   };
 }
 
+// Helper function to log alert history
+async function logAlertHistory(
+  alertId: string,
+  action: 'created' | 'updated' | 'deleted' | 'activated' | 'deactivated',
+  changes?: Record<string, any>
+): Promise<void> {
+  try {
+    await prisma.alertHistory.create({
+      data: {
+        alertId,
+        action,
+        changes: changes ? JSON.stringify(changes) : null,
+        timestamp: Date.now(),
+      },
+    });
+  } catch (error) {
+    console.error(`Error logging alert history for ${alertId}:`, error);
+    // Don't throw - history logging shouldn't break the main operation
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -122,6 +143,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Log creation
+    await logAlertHistory(newAlert.id, 'created', {
+      coinId: newAlert.coinId,
+      targetPrice: newAlert.targetPrice,
+      type: newAlert.type,
+      currency: newAlert.currency,
+    });
+
     return NextResponse.json(prismaToPriceAlert(newAlert), { status: 201 });
   } catch (error: any) {
     console.error('Error creating alert:', error);
@@ -155,27 +184,78 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Track changes for history
+    const changes: Record<string, any> = {};
+    
     // Prepare update data (exclude id from updates)
     const updateData: any = {};
-    if (body.coinId !== undefined) updateData.coinId = body.coinId;
-    if (body.coinName !== undefined) updateData.coinName = body.coinName;
-    if (body.coinSymbol !== undefined) updateData.coinSymbol = body.coinSymbol;
-    if (body.coinImage !== undefined) updateData.coinImage = body.coinImage;
-    if (body.targetPrice !== undefined) updateData.targetPrice = parseFloat(body.targetPrice);
-    if (body.type !== undefined) updateData.type = body.type;
-    if (body.currency !== undefined) updateData.currency = body.currency;
-    if (body.isActive !== undefined) updateData.isActive = body.isActive;
+    if (body.coinId !== undefined) {
+      updateData.coinId = body.coinId;
+      changes.coinId = body.coinId;
+    }
+    if (body.coinName !== undefined) {
+      updateData.coinName = body.coinName;
+      changes.coinName = body.coinName;
+    }
+    if (body.coinSymbol !== undefined) {
+      updateData.coinSymbol = body.coinSymbol;
+      changes.coinSymbol = body.coinSymbol;
+    }
+    if (body.coinImage !== undefined) {
+      updateData.coinImage = body.coinImage;
+      changes.coinImage = body.coinImage;
+    }
+    if (body.targetPrice !== undefined) {
+      updateData.targetPrice = parseFloat(body.targetPrice);
+      changes.targetPrice = parseFloat(body.targetPrice);
+    }
+    if (body.type !== undefined) {
+      updateData.type = body.type;
+      changes.type = body.type;
+    }
+    if (body.currency !== undefined) {
+      updateData.currency = body.currency;
+      changes.currency = body.currency;
+    }
+    if (body.isActive !== undefined) {
+      const wasActive = existing.isActive;
+      updateData.isActive = body.isActive;
+      changes.isActive = body.isActive;
+      // Log activation/deactivation separately
+      if (wasActive !== body.isActive) {
+        await logAlertHistory(body.id, body.isActive ? 'activated' : 'deactivated');
+      }
+    }
     if (body.createdAt !== undefined) updateData.createdAt = body.createdAt;
     if (body.triggeredAt !== undefined) updateData.triggeredAt = body.triggeredAt ?? null;
-    if (body.note !== undefined) updateData.note = body.note ?? null;
-    if (body.emailNotification !== undefined) updateData.emailNotification = body.emailNotification;
-    if (body.emailAddress !== undefined) updateData.emailAddress = body.emailAddress ?? null;
-    if (body.browserNotification !== undefined) updateData.browserNotification = body.browserNotification;
+    if (body.note !== undefined) {
+      updateData.note = body.note ?? null;
+      changes.note = body.note ?? null;
+    }
+    if (body.emailNotification !== undefined) {
+      updateData.emailNotification = body.emailNotification;
+      changes.emailNotification = body.emailNotification;
+    }
+    if (body.emailAddress !== undefined) {
+      updateData.emailAddress = body.emailAddress ?? null;
+      changes.emailAddress = body.emailAddress ?? null;
+    }
+    if (body.browserNotification !== undefined) {
+      updateData.browserNotification = body.browserNotification;
+      changes.browserNotification = body.browserNotification;
+    }
 
     const updatedAlert = await prisma.priceAlert.update({
       where: { id: body.id },
       data: updateData,
     });
+
+    // Log update if there were changes (excluding isActive which is logged separately)
+    const changesWithoutActive = { ...changes };
+    delete changesWithoutActive.isActive;
+    if (Object.keys(changesWithoutActive).length > 0) {
+      await logAlertHistory(body.id, 'updated', changesWithoutActive);
+    }
 
     return NextResponse.json(prismaToPriceAlert(updatedAlert));
   } catch (error: any) {
@@ -210,6 +290,13 @@ export async function DELETE(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // Log deletion before deleting
+    await logAlertHistory(alertId, 'deleted', {
+      coinId: existing.coinId,
+      coinName: existing.coinName,
+      targetPrice: existing.targetPrice,
+    });
 
     await prisma.priceAlert.delete({
       where: { id: alertId },

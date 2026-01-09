@@ -94,13 +94,39 @@ export class PriceAlertWorker {
   /**
    * Mark an alert as triggered
    */
-  async markAlertAsTriggered(alertId: string): Promise<void> {
+  async markAlertAsTriggered(alertId: string, currentPrice: number, emailSent: boolean, emailAddress?: string, browserNotificationSent: boolean = false): Promise<void> {
     try {
+      const alert = await prisma.priceAlert.findUnique({
+        where: { id: alertId },
+      });
+
+      if (!alert) {
+        throw new Error(`Alert ${alertId} not found`);
+      }
+
+      const timestamp = Date.now();
+
+      // Update alert
       await prisma.priceAlert.update({
         where: { id: alertId },
         data: {
-          triggeredAt: Date.now(),
+          triggeredAt: timestamp,
           isActive: false,
+        },
+      });
+
+      // Log trigger event
+      await prisma.alertTriggerLog.create({
+        data: {
+          alertId: alertId,
+          currentPrice: currentPrice,
+          targetPrice: alert.targetPrice,
+          type: alert.type,
+          currency: alert.currency,
+          emailSent: emailSent,
+          emailAddress: emailAddress ?? null,
+          browserNotificationSent: browserNotificationSent,
+          timestamp: timestamp,
         },
       });
     } catch (error) {
@@ -197,13 +223,20 @@ This alert was created on ${new Date(alert.createdAt).toLocaleString()}.
         };
       }
 
-      // Mark as triggered first to prevent duplicate notifications
-      await this.markAlertAsTriggered(alert.id);
-
       // Send email notification if enabled
+      let emailSent = false;
       if (alert.emailNotification) {
-        await this.sendEmailNotification(alert, currentPrice);
+        emailSent = await this.sendEmailNotification(alert, currentPrice);
       }
+
+      // Mark as triggered and log the event
+      await this.markAlertAsTriggered(
+        alert.id,
+        currentPrice,
+        emailSent,
+        alert.emailAddress,
+        alert.browserNotification || false
+      );
 
       const currency = alert.currency as Currency;
       console.log(`✅ Alert triggered: ${alert.coinName} (${alert.coinSymbol}) - ${alert.type} ${formatCurrency(alert.targetPrice, currency)} (Current: ${formatCurrency(currentPrice, currency)})`);

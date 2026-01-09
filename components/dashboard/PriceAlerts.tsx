@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Bell, Plus, X, TrendingUp, TrendingDown, Edit2, Trash2, ToggleLeft, ToggleRight, Mail, Smartphone } from 'lucide-react';
+import { Bell, Plus, X, TrendingUp, TrendingDown, Edit2, Trash2, ToggleLeft, ToggleRight, Mail, Smartphone, History, Activity } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -16,6 +16,36 @@ interface PriceAlertsProps {
   coin: CoinData | null;
 }
 
+interface AlertHistoryItem {
+  id: string;
+  alertId: string;
+  action: string;
+  changes: Record<string, any> | null;
+  timestamp: number;
+}
+
+interface AlertTriggerLog {
+  id: string;
+  alertId: string;
+  alert?: {
+    id: string;
+    coinId: string;
+    coinName: string;
+    coinSymbol: string;
+    coinImage: string;
+  };
+  currentPrice: number;
+  targetPrice: number;
+  type: string;
+  currency: string;
+  emailSent: boolean;
+  emailAddress?: string;
+  browserNotificationSent: boolean;
+  timestamp: number;
+}
+
+type TabType = 'alerts' | 'history' | 'triggers';
+
 export const PriceAlerts: React.FC<PriceAlertsProps> = ({ coin }) => {
   const currency = useDashboardStore((state) => state.currency);
   const { alerts, addAlert, removeAlert, updateAlert, toggleAlert, getAlertsForCoin } = usePriceAlerts();
@@ -29,6 +59,11 @@ export const PriceAlerts: React.FC<PriceAlertsProps> = ({ coin }) => {
   const [emailAddress, setEmailAddress] = useState('');
   const [browserNotification, setBrowserNotification] = useState(false);
   const [browserNotificationPermission, setBrowserNotificationPermission] = useState<'default' | 'granted' | 'denied'>('default');
+  const [activeTab, setActiveTab] = useState<TabType>('alerts');
+  const [alertHistory, setAlertHistory] = useState<AlertHistoryItem[]>([]);
+  const [triggerLogs, setTriggerLogs] = useState<AlertTriggerLog[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isLoadingTriggers, setIsLoadingTriggers] = useState(false);
 
   useEffect(() => {
     if (coin) {
@@ -38,6 +73,92 @@ export const PriceAlerts: React.FC<PriceAlertsProps> = ({ coin }) => {
       setCoinAlerts([]);
     }
   }, [coin, alerts, getAlertsForCoin]);
+
+  // Load alert history
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadAlertHistory();
+    }
+  }, [activeTab, coin]);
+
+  // Load trigger logs
+  useEffect(() => {
+    if (activeTab === 'triggers') {
+      loadTriggerLogs();
+    }
+  }, [activeTab, coin]);
+
+  const loadAlertHistory = async () => {
+    if (!coin) return;
+    
+    setIsLoadingHistory(true);
+    try {
+      const alertIds = coinAlerts.map(a => a.id);
+      const allHistory: AlertHistoryItem[] = [];
+      
+      // Load history for each alert
+      for (const alertId of alertIds) {
+        const response = await fetch(`/api/alerts/history?alertId=${alertId}&limit=100`);
+        if (response.ok) {
+          const data = await response.json();
+          allHistory.push(...data.history);
+        }
+      }
+      
+      // Also load all history if no specific alerts
+      if (alertIds.length === 0) {
+        const response = await fetch(`/api/alerts/history?limit=100`);
+        if (response.ok) {
+          const data = await response.json();
+          allHistory.push(...data.history);
+        }
+      }
+      
+      // Sort by timestamp descending
+      allHistory.sort((a, b) => b.timestamp - a.timestamp);
+      setAlertHistory(allHistory);
+    } catch (error) {
+      console.error('Failed to load alert history:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const loadTriggerLogs = async () => {
+    if (!coin) return;
+    
+    setIsLoadingTriggers(true);
+    try {
+      const alertIds = coinAlerts.map(a => a.id);
+      const allLogs: AlertTriggerLog[] = [];
+      
+      // Load logs for each alert
+      for (const alertId of alertIds) {
+        const response = await fetch(`/api/alerts/triggers?alertId=${alertId}&limit=100`);
+        if (response.ok) {
+          const data = await response.json();
+          allLogs.push(...data.logs);
+        }
+      }
+      
+      // Also load all logs if no specific alerts
+      if (alertIds.length === 0) {
+        const response = await fetch(`/api/alerts/triggers?limit=100`);
+        if (response.ok) {
+          const data = await response.json();
+          allLogs.push(...data.logs);
+        }
+      }
+      
+      // Sort by timestamp descending
+      allLogs.sort((a, b) => b.timestamp - a.timestamp);
+      setTriggerLogs(allLogs);
+    } catch (error) {
+      console.error('Failed to load trigger logs:', error);
+    } finally {
+      setIsLoadingTriggers(false);
+    }
+  };
 
   // Check browser notification permission on mount
   useEffect(() => {
@@ -200,12 +321,12 @@ export const PriceAlerts: React.FC<PriceAlertsProps> = ({ coin }) => {
   return (
     <Card className="overflow-hidden">
       <CardHeader className="p-3 sm:p-4 md:p-5 lg:p-6 pb-2 sm:pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <CardTitle className="text-sm sm:text-base md:text-lg flex items-center">
             <Bell className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-primary-600" />
             Price Alerts
           </CardTitle>
-          {!isAddingAlert && (
+          {!isAddingAlert && activeTab === 'alerts' && (
             <Button
               variant="outline"
               size="sm"
@@ -217,9 +338,185 @@ export const PriceAlerts: React.FC<PriceAlertsProps> = ({ coin }) => {
             </Button>
           )}
         </div>
+        
+        {/* Tabs */}
+        <div className="flex gap-2 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('alerts')}
+            className={`px-3 py-2 text-xs sm:text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'alerts'
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Bell className="h-3 w-3 sm:h-4 sm:w-4 inline mr-1" />
+            Alerts
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-3 py-2 text-xs sm:text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'history'
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <History className="h-3 w-3 sm:h-4 sm:w-4 inline mr-1" />
+            History
+          </button>
+          <button
+            onClick={() => setActiveTab('triggers')}
+            className={`px-3 py-2 text-xs sm:text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'triggers'
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Activity className="h-3 w-3 sm:h-4 sm:w-4 inline mr-1" />
+            Triggers
+          </button>
+        </div>
       </CardHeader>
       <CardContent className="p-3 sm:p-4 md:p-5 lg:p-6 pt-2 sm:pt-3">
-        {isAddingAlert ? (
+        {activeTab === 'history' ? (
+          <div className="space-y-2">
+            {isLoadingHistory ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-gray-500">Loading history...</p>
+              </div>
+            ) : alertHistory.length === 0 ? (
+              <div className="text-center py-8">
+                <History className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-500">No alert history</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {alertHistory.map((item) => {
+                  const actionColors: Record<string, string> = {
+                    created: 'bg-green-100 text-green-700',
+                    updated: 'bg-blue-100 text-blue-700',
+                    deleted: 'bg-red-100 text-red-700',
+                    activated: 'bg-green-100 text-green-700',
+                    deactivated: 'bg-gray-100 text-gray-700',
+                  };
+                  
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-3 rounded-lg border border-gray-200 bg-white"
+                    >
+                      <div className="flex items-start justify-between mb-1">
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            actionColors[item.action] || 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          {item.action.charAt(0).toUpperCase() + item.action.slice(1)}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(item.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                      {item.changes && Object.keys(item.changes).length > 0 && (
+                        <div className="mt-2 text-xs text-gray-600">
+                          <div className="space-y-1">
+                            {Object.entries(item.changes).map(([key, value]) => (
+                              <div key={key}>
+                                <span className="font-medium">{key}:</span>{' '}
+                                <span>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : activeTab === 'triggers' ? (
+          <div className="space-y-2">
+            {isLoadingTriggers ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-gray-500">Loading trigger logs...</p>
+              </div>
+            ) : triggerLogs.length === 0 ? (
+              <div className="text-center py-8">
+                <Activity className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-500">No trigger logs</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {triggerLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="p-3 rounded-lg border border-gray-200 bg-white"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {log.alert && (
+                          <>
+                            <img
+                              src={sanitizeUrl(log.alert.coinImage)}
+                              alt={escapeHtml(log.alert.coinName)}
+                              className="w-5 h-5 rounded-full flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
+                                {escapeHtml(log.alert.coinName)}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {log.type === 'above' ? (
+                                  <TrendingUp className="h-3 w-3 inline text-green-600 mr-1" />
+                                ) : (
+                                  <TrendingDown className="h-3 w-3 inline text-red-600 mr-1" />
+                                )}
+                                {log.type === 'above' ? 'Above' : 'Below'}{' '}
+                                {formatCurrency(log.targetPrice, log.currency as Currency)}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-gray-500">Target:</span>{' '}
+                          <span className="font-medium">{formatCurrency(log.targetPrice, log.currency as Currency)}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Triggered At:</span>{' '}
+                          <span className="font-medium text-green-600">{formatCurrency(log.currentPrice, log.currency as Currency)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 mt-2 text-xs">
+                        {log.emailSent && (
+                          <div className="flex items-center gap-1 text-gray-600">
+                            <Mail className="h-3 w-3 text-primary-600" />
+                            <span>Email sent</span>
+                            {log.emailAddress && (
+                              <span className="text-gray-400">({log.emailAddress})</span>
+                            )}
+                          </div>
+                        )}
+                        {log.browserNotificationSent && (
+                          <div className="flex items-center gap-1 text-gray-600">
+                            <Smartphone className="h-3 w-3 text-primary-600" />
+                            <span>Browser notification</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : isAddingAlert ? (
           <div className="space-y-3 sm:space-y-4">
             <div className="flex items-center gap-2 mb-2">
               <img

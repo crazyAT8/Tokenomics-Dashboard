@@ -27,8 +27,43 @@ model PriceAlert {
   emailAddress      String?
   browserNotification Boolean? @default(false)
   
+  history           AlertHistory[]
+  triggerLogs       AlertTriggerLog[]
+  
   @@index([coinId])
   @@index([isActive])
   @@index([createdAt])
+}
+
+model AlertHistory {
+  id                String   @id @default(uuid())
+  alertId           String
+  action            String   // 'created', 'updated', 'deleted', 'activated', 'deactivated'
+  changes           String?  // JSON string of changed fields
+  timestamp         Int      // Unix timestamp in milliseconds
+  
+  alert             PriceAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  
+  @@index([alertId])
+  @@index([timestamp])
+  @@index([action])
+}
+
+model AlertTriggerLog {
+  id                String   @id @default(uuid())
+  alertId           String
+  currentPrice      Float
+  targetPrice       Float
+  type              String   // 'above' or 'below'
+  currency          String
+  emailSent         Boolean  @default(false)
+  emailAddress      String?
+  browserNotificationSent Boolean @default(false)
+  timestamp         Int      // Unix timestamp in milliseconds
+  
+  alert             PriceAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  
+  @@index([alertId])
+  @@index([timestamp])
 }
 
