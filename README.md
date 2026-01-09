@@ -175,6 +175,9 @@ pnpm install
 Create a `.env.local` file in the root directory:
 
 ```env
+# Database Configuration (Required)
+DATABASE_URL="file:./dev.db"
+
 # Redis Configuration (Optional)
 REDIS_URL=redis://localhost:6379
 
@@ -189,7 +192,21 @@ COINGECKO_API_URL=https://api.coingecko.com/api/v3
 
 **Note**: Redis is optional. The application will automatically use in-memory caching if Redis is not configured.
 
-### 4. (Optional) Set Up Redis
+### 4. Set Up Database
+
+The application uses SQLite with Prisma for persistent storage of price alerts. The database will be automatically created when you run the first migration.
+
+```bash
+# Generate Prisma Client
+npx prisma generate
+
+# Run database migrations
+npx prisma migrate dev
+```
+
+The database file (`dev.db`) will be created in the `prisma` directory. For production, you can switch to PostgreSQL or MySQL by updating the `DATABASE_URL` in your environment variables and changing the provider in `prisma/schema.prisma`.
+
+### 5. (Optional) Set Up Redis
 
 For production deployments, Redis is recommended. See the [Redis Setup Guide](./docs/REDIS_SETUP.md) for detailed instructions.
 
@@ -198,7 +215,7 @@ Quick setup with Docker:
 docker run -d -p 6379:6379 --name redis-tokenomics redis:latest
 ```
 
-### 5. Run the Development Server
+### 6. Run the Development Server
 
 ```bash
 npm run dev
@@ -214,6 +231,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
+| `DATABASE_URL` | Database connection string (SQLite, PostgreSQL, etc.) | `file:./dev.db` | Yes |
 | `REDIS_URL` | Redis connection URL | - | No |
 | `USE_REDIS` | Force Redis usage | `auto` | No |
 | `CACHE_DEFAULT_TTL` | Default cache TTL in seconds | `300` | No |
@@ -638,6 +656,7 @@ See [E2E Tests README](./e2e/README.md) for more information.
 
 **Environment Variables for Vercel:**
 
+- `DATABASE_URL` (required - use PostgreSQL connection string for production)
 - `REDIS_URL` (if using Redis)
 - `CACHE_DEFAULT_TTL` (optional)
 - `CACHE_NAMESPACE` (optional)

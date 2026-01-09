@@ -1,44 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PriceAlert } from '@/lib/types';
-import { getCache } from '@/lib/cache/cache';
-
-const ALERTS_STORAGE_KEY = 'price-alerts:all';
-const ALERTS_TTL = 365 * 24 * 60 * 60; // 1 year TTL for alerts
+import { prisma } from '@/lib/db';
 
 /**
  * Price Alerts API Route
  * 
  * Manages server-side storage of price alerts for background monitoring.
- * This complements the client-side localStorage storage and enables
- * server-side alert monitoring even when the browser is closed.
+ * Uses database storage for persistent, reliable alert management.
  * 
  * GET: Retrieve all alerts or a specific alert
  * POST: Create a new alert
  * PUT: Update an existing alert
  * DELETE: Delete an alert
  */
+
+// Helper function to convert Prisma model to PriceAlert type
+function prismaToPriceAlert(prismaAlert: any): PriceAlert {
+  return {
+    id: prismaAlert.id,
+    coinId: prismaAlert.coinId,
+    coinName: prismaAlert.coinName,
+    coinSymbol: prismaAlert.coinSymbol,
+    coinImage: prismaAlert.coinImage,
+    targetPrice: prismaAlert.targetPrice,
+    type: prismaAlert.type as 'above' | 'below',
+    currency: prismaAlert.currency as PriceAlert['currency'],
+    isActive: prismaAlert.isActive,
+    createdAt: prismaAlert.createdAt,
+    triggeredAt: prismaAlert.triggeredAt ?? undefined,
+    note: prismaAlert.note ?? undefined,
+    emailNotification: prismaAlert.emailNotification ?? undefined,
+    emailAddress: prismaAlert.emailAddress ?? undefined,
+    browserNotification: prismaAlert.browserNotification ?? undefined,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const alertId = searchParams.get('id');
-    const cache = getCache();
-
-    const allAlerts = (await cache.get<PriceAlert[]>(ALERTS_STORAGE_KEY, {
-      namespace: 'alerts',
-    })) || [];
 
     if (alertId) {
-      const alert = allAlerts.find(a => a.id === alertId);
+      const alert = await prisma.priceAlert.findUnique({
+        where: { id: alertId },
+      });
+
       if (!alert) {
         return NextResponse.json(
           { error: 'Alert not found' },
           { status: 404 }
         );
       }
-      return NextResponse.json(alert);
+
+      return NextResponse.json(prismaToPriceAlert(alert));
     }
 
-    return NextResponse.json(allAlerts);
+    const allAlerts = await prisma.priceAlert.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return NextResponse.json(allAlerts.map(prismaToPriceAlert));
   } catch (error: any) {
     console.error('Error fetching alerts:', error);
     return NextResponse.json(
@@ -51,7 +72,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const cache = getCache();
 
     // Validate required fields
     if (!body.coinId || !body.targetPrice || !body.type) {
@@ -61,51 +81,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate alert ID if not provided
-    const alertId = body.id || `${body.coinId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    const newAlert: PriceAlert = {
-      id: alertId,
-      coinId: body.coinId,
-      coinName: body.coinName || body.coinId,
-      coinSymbol: body.coinSymbol || body.coinId.toUpperCase(),
-      coinImage: body.coinImage || '',
-      targetPrice: parseFloat(body.targetPrice),
-      type: body.type, // 'above' or 'below'
-      currency: body.currency || 'usd',
-      isActive: body.isActive !== undefined ? body.isActive : true,
-      createdAt: body.createdAt || Date.now(),
-      triggeredAt: body.triggeredAt,
-      note: body.note,
-      emailNotification: body.emailNotification,
-      emailAddress: body.emailAddress,
-      browserNotification: body.browserNotification,
-    };
-
-    // Get existing alerts
-    const allAlerts = (await cache.get<PriceAlert[]>(ALERTS_STORAGE_KEY, {
-      namespace: 'alerts',
-    })) || [];
-
-    // Check if alert with same ID already exists
-    const existingIndex = allAlerts.findIndex(a => a.id === alertId);
-    if (existingIndex >= 0) {
+    // Validate type
+    if (body.type !== 'above' && body.type !== 'below') {
       return NextResponse.json(
-        { error: 'Alert with this ID already exists' },
-        { status: 409 }
+        { error: 'Invalid type. Must be "above" or "below"' },
+        { status: 400 }
       );
     }
 
-    // Add new alert
-    allAlerts.push(newAlert);
+    // Check if alert with same ID already exists (if ID provided)
+    if (body.id) {
+      const existing = await prisma.priceAlert.findUnique({
+        where: { id: body.id },
+      });
+      if (existing) {
+        return NextResponse.json(
+          { error: 'Alert with this ID already exists' },
+          { status: 409 }
+        );
+      }
+    }
 
-    // Save back to cache
-    await cache.set(ALERTS_STORAGE_KEY, allAlerts, {
-      namespace: 'alerts',
-      ttl: ALERTS_TTL,
+    const newAlert = await prisma.priceAlert.create({
+      data: {
+        id: body.id, // Will use UUID if not provided
+        coinId: body.coinId,
+        coinName: body.coinName || body.coinId,
+        coinSymbol: body.coinSymbol || body.coinId.toUpperCase(),
+        coinImage: body.coinImage || '',
+        targetPrice: parseFloat(body.targetPrice),
+        type: body.type,
+        currency: body.currency || 'usd',
+        isActive: body.isActive !== undefined ? body.isActive : true,
+        createdAt: body.createdAt || Date.now(),
+        triggeredAt: body.triggeredAt ?? null,
+        note: body.note ?? null,
+        emailNotification: body.emailNotification ?? false,
+        emailAddress: body.emailAddress ?? null,
+        browserNotification: body.browserNotification ?? false,
+      },
     });
 
-    return NextResponse.json(newAlert, { status: 201 });
+    return NextResponse.json(prismaToPriceAlert(newAlert), { status: 201 });
   } catch (error: any) {
     console.error('Error creating alert:', error);
     return NextResponse.json(
@@ -118,7 +135,6 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const cache = getCache();
 
     if (!body.id) {
       return NextResponse.json(
@@ -127,33 +143,41 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Get existing alerts
-    const allAlerts = (await cache.get<PriceAlert[]>(ALERTS_STORAGE_KEY, {
-      namespace: 'alerts',
-    })) || [];
+    // Check if alert exists
+    const existing = await prisma.priceAlert.findUnique({
+      where: { id: body.id },
+    });
 
-    const alertIndex = allAlerts.findIndex(a => a.id === body.id);
-    if (alertIndex < 0) {
+    if (!existing) {
       return NextResponse.json(
         { error: 'Alert not found' },
         { status: 404 }
       );
     }
 
-    // Update alert
-    allAlerts[alertIndex] = {
-      ...allAlerts[alertIndex],
-      ...body,
-      id: allAlerts[alertIndex].id, // Prevent ID changes
-    };
+    // Prepare update data (exclude id from updates)
+    const updateData: any = {};
+    if (body.coinId !== undefined) updateData.coinId = body.coinId;
+    if (body.coinName !== undefined) updateData.coinName = body.coinName;
+    if (body.coinSymbol !== undefined) updateData.coinSymbol = body.coinSymbol;
+    if (body.coinImage !== undefined) updateData.coinImage = body.coinImage;
+    if (body.targetPrice !== undefined) updateData.targetPrice = parseFloat(body.targetPrice);
+    if (body.type !== undefined) updateData.type = body.type;
+    if (body.currency !== undefined) updateData.currency = body.currency;
+    if (body.isActive !== undefined) updateData.isActive = body.isActive;
+    if (body.createdAt !== undefined) updateData.createdAt = body.createdAt;
+    if (body.triggeredAt !== undefined) updateData.triggeredAt = body.triggeredAt ?? null;
+    if (body.note !== undefined) updateData.note = body.note ?? null;
+    if (body.emailNotification !== undefined) updateData.emailNotification = body.emailNotification;
+    if (body.emailAddress !== undefined) updateData.emailAddress = body.emailAddress ?? null;
+    if (body.browserNotification !== undefined) updateData.browserNotification = body.browserNotification;
 
-    // Save back to cache
-    await cache.set(ALERTS_STORAGE_KEY, allAlerts, {
-      namespace: 'alerts',
-      ttl: ALERTS_TTL,
+    const updatedAlert = await prisma.priceAlert.update({
+      where: { id: body.id },
+      data: updateData,
     });
 
-    return NextResponse.json(allAlerts[alertIndex]);
+    return NextResponse.json(prismaToPriceAlert(updatedAlert));
   } catch (error: any) {
     console.error('Error updating alert:', error);
     return NextResponse.json(
@@ -167,7 +191,6 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const alertId = searchParams.get('id');
-    const cache = getCache();
 
     if (!alertId) {
       return NextResponse.json(
@@ -176,26 +199,20 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Get existing alerts
-    const allAlerts = (await cache.get<PriceAlert[]>(ALERTS_STORAGE_KEY, {
-      namespace: 'alerts',
-    })) || [];
+    // Check if alert exists
+    const existing = await prisma.priceAlert.findUnique({
+      where: { id: alertId },
+    });
 
-    const alertIndex = allAlerts.findIndex(a => a.id === alertId);
-    if (alertIndex < 0) {
+    if (!existing) {
       return NextResponse.json(
         { error: 'Alert not found' },
         { status: 404 }
       );
     }
 
-    // Remove alert
-    allAlerts.splice(alertIndex, 1);
-
-    // Save back to cache
-    await cache.set(ALERTS_STORAGE_KEY, allAlerts, {
-      namespace: 'alerts',
-      ttl: ALERTS_TTL,
+    await prisma.priceAlert.delete({
+      where: { id: alertId },
     });
 
     return NextResponse.json({ success: true, message: 'Alert deleted' });

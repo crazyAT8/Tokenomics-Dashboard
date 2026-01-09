@@ -1,11 +1,14 @@
 import { PriceAlert } from '@/lib/types';
 
 /**
- * Utility functions for syncing price alerts between client and server
+ * Utility functions for syncing price alerts
+ * 
+ * Note: Alerts are now stored in the database. These functions can be used
+ * for migrating alerts from localStorage or syncing between different sources.
  */
 
 /**
- * Sync alerts from localStorage to server
+ * Sync alerts to server/database
  * Useful for migrating existing alerts or syncing on app load
  */
 export async function syncAlertsToServer(

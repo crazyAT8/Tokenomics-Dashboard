@@ -1,0 +1,34 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model PriceAlert {
+  id                String   @id @default(uuid())
+  coinId            String
+  coinName          String
+  coinSymbol        String
+  coinImage         String   @default("")
+  targetPrice       Float
+  type              String   // 'above' or 'below'
+  currency          String   @default("usd")
+  isActive          Boolean  @default(true)
+  createdAt         Int      // Unix timestamp in milliseconds
+  triggeredAt       Int?     // Unix timestamp in milliseconds
+  note              String?
+  emailNotification Boolean? @default(false)
+  emailAddress      String?
+  browserNotification Boolean? @default(false)
+  
+  @@index([coinId])
+  @@index([isActive])
+  @@index([createdAt])
+}
+

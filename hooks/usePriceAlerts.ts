@@ -4,38 +4,39 @@ import { useState, useEffect, useCallback } from 'react';
 import { PriceAlert, PriceAlertType, CoinData } from '@/lib/types';
 import { Currency } from '@/lib/store';
 
-const PRICE_ALERTS_STORAGE_KEY = 'tokenomics-dashboard-price-alerts';
-
 /**
- * Hook to manage price alerts in local storage
+ * Hook to manage price alerts using database storage via API
  */
 export function usePriceAlerts() {
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load alerts from localStorage on mount
+  // Load alerts from API on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(PRICE_ALERTS_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setAlerts(Array.isArray(parsed) ? parsed : []);
+    const fetchAlerts = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await fetch('/api/alerts');
+        if (!response.ok) {
+          throw new Error('Failed to fetch alerts');
+        }
+        const data = await response.json();
+        setAlerts(Array.isArray(data) ? data : []);
+      } catch (err: any) {
+        console.error('Failed to load price alerts:', err);
+        setError(err.message || 'Failed to load alerts');
+        setAlerts([]);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to load price alerts:', error);
-      setAlerts([]);
-    }
+    };
+
+    fetchAlerts();
   }, []);
 
-  // Save alerts to localStorage whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem(PRICE_ALERTS_STORAGE_KEY, JSON.stringify(alerts));
-    } catch (error) {
-      console.error('Failed to save price alerts:', error);
-    }
-  }, [alerts]);
-
-  const addAlert = useCallback((
+  const addAlert = useCallback(async (
     coin: CoinData,
     targetPrice: number,
     type: PriceAlertType,
@@ -44,45 +45,103 @@ export function usePriceAlerts() {
     emailNotification?: boolean,
     emailAddress?: string,
     browserNotification?: boolean
-  ) => {
-    const newAlert: PriceAlert = {
-      id: `${coin.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      coinId: coin.id,
-      coinName: coin.name,
-      coinSymbol: coin.symbol,
-      coinImage: coin.image,
-      targetPrice,
-      type,
-      currency,
-      isActive: true,
-      createdAt: Date.now(),
-      note,
-      emailNotification,
-      emailAddress,
-      browserNotification,
-    };
+  ): Promise<string> => {
+    try {
+      const response = await fetch('/api/alerts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          coinId: coin.id,
+          coinName: coin.name,
+          coinSymbol: coin.symbol,
+          coinImage: coin.image,
+          targetPrice,
+          type,
+          currency,
+          isActive: true,
+          createdAt: Date.now(),
+          note,
+          emailNotification,
+          emailAddress,
+          browserNotification,
+        }),
+      });
 
-    setAlerts((prev) => [...prev, newAlert]);
-    return newAlert.id;
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to create alert');
+      }
+
+      const newAlert = await response.json();
+      setAlerts((prev) => [...prev, newAlert]);
+      return newAlert.id;
+    } catch (err: any) {
+      console.error('Failed to add alert:', err);
+      setError(err.message || 'Failed to add alert');
+      throw err;
+    }
   }, []);
 
-  const removeAlert = useCallback((id: string) => {
-    setAlerts((prev) => prev.filter((alert) => alert.id !== id));
+  const removeAlert = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/alerts?id=${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to delete alert');
+      }
+
+      setAlerts((prev) => prev.filter((alert) => alert.id !== id));
+    } catch (err: any) {
+      console.error('Failed to remove alert:', err);
+      setError(err.message || 'Failed to remove alert');
+      throw err;
+    }
   }, []);
 
-  const updateAlert = useCallback((id: string, updates: Partial<PriceAlert>) => {
-    setAlerts((prev) =>
-      prev.map((alert) => (alert.id === id ? { ...alert, ...updates } : alert))
-    );
+  const updateAlert = useCallback(async (id: string, updates: Partial<PriceAlert>) => {
+    try {
+      const response = await fetch('/api/alerts', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id,
+          ...updates,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to update alert');
+      }
+
+      const updatedAlert = await response.json();
+      setAlerts((prev) =>
+        prev.map((alert) => (alert.id === id ? updatedAlert : alert))
+      );
+    } catch (err: any) {
+      console.error('Failed to update alert:', err);
+      setError(err.message || 'Failed to update alert');
+      throw err;
+    }
   }, []);
 
-  const toggleAlert = useCallback((id: string) => {
-    setAlerts((prev) =>
-      prev.map((alert) =>
-        alert.id === id ? { ...alert, isActive: !alert.isActive } : alert
-      )
-    );
-  }, []);
+  const toggleAlert = useCallback(async (id: string) => {
+    const alert = alerts.find((a) => a.id === id);
+    if (!alert) return;
+
+    try {
+      await updateAlert(id, { isActive: !alert.isActive });
+    } catch (err) {
+      // Error already handled in updateAlert
+    }
+  }, [alerts, updateAlert]);
 
   const getAlertsForCoin = useCallback((coinId: string) => {
     return alerts.filter((alert) => alert.coinId === coinId);
@@ -92,16 +151,39 @@ export function usePriceAlerts() {
     return alerts.filter((alert) => alert.isActive && !alert.triggeredAt);
   }, [alerts]);
 
-  const markAlertAsTriggered = useCallback((id: string) => {
-    setAlerts((prev) =>
-      prev.map((alert) =>
-        alert.id === id ? { ...alert, triggeredAt: Date.now(), isActive: false } : alert
-      )
-    );
+  const markAlertAsTriggered = useCallback(async (id: string) => {
+    try {
+      await updateAlert(id, {
+        triggeredAt: Date.now(),
+        isActive: false,
+      });
+    } catch (err) {
+      // Error already handled in updateAlert
+    }
+  }, [updateAlert]);
+
+  const refreshAlerts = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await fetch('/api/alerts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch alerts');
+      }
+      const data = await response.json();
+      setAlerts(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      console.error('Failed to refresh alerts:', err);
+      setError(err.message || 'Failed to refresh alerts');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   return {
     alerts,
+    isLoading,
+    error,
     addAlert,
     removeAlert,
     updateAlert,
@@ -109,6 +191,7 @@ export function usePriceAlerts() {
     getAlertsForCoin,
     getActiveAlerts,
     markAlertAsTriggered,
+    refreshAlerts,
   };
 }
 

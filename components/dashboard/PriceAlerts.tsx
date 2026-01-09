@@ -68,7 +68,7 @@ export const PriceAlerts: React.FC<PriceAlertsProps> = ({ coin }) => {
     }
   };
 
-  const handleAddAlert = () => {
+  const handleAddAlert = async () => {
     if (!coin || !targetPrice) return;
 
     const price = parseFloat(targetPrice);
@@ -93,23 +93,27 @@ export const PriceAlerts: React.FC<PriceAlertsProps> = ({ coin }) => {
       return;
     }
 
-    addAlert(
-      coin,
-      price,
-      alertType,
-      currency,
-      note || undefined,
-      emailNotification,
-      emailNotification ? emailAddress : undefined,
-      browserNotification
-    );
-    setTargetPrice('');
-    setNote('');
-    setAlertType('above');
-    setEmailNotification(false);
-    setEmailAddress('');
-    setBrowserNotification(false);
-    setIsAddingAlert(false);
+    try {
+      await addAlert(
+        coin,
+        price,
+        alertType,
+        currency,
+        note || undefined,
+        emailNotification,
+        emailNotification ? emailAddress : undefined,
+        browserNotification
+      );
+      setTargetPrice('');
+      setNote('');
+      setAlertType('above');
+      setEmailNotification(false);
+      setEmailAddress('');
+      setBrowserNotification(false);
+      setIsAddingAlert(false);
+    } catch (error: any) {
+      alert(`Failed to add alert: ${error.message || 'Unknown error'}`);
+    }
   };
 
   const handleEditAlert = (alert: PriceAlert) => {
@@ -123,7 +127,7 @@ export const PriceAlerts: React.FC<PriceAlertsProps> = ({ coin }) => {
     setIsAddingAlert(true);
   };
 
-  const handleUpdateAlert = () => {
+  const handleUpdateAlert = async () => {
     if (!coin || !targetPrice || !editingAlertId) return;
 
     const price = parseFloat(targetPrice);
@@ -148,23 +152,26 @@ export const PriceAlerts: React.FC<PriceAlertsProps> = ({ coin }) => {
       return;
     }
 
-    updateAlert(editingAlertId, {
-      targetPrice: price,
-      type: alertType,
-      note: note || undefined,
-      emailNotification,
-      emailAddress: emailNotification ? emailAddress : undefined,
-      browserNotification,
-    });
-
-    setTargetPrice('');
-    setNote('');
-    setAlertType('above');
-    setEmailNotification(false);
-    setEmailAddress('');
-    setBrowserNotification(false);
-    setIsAddingAlert(false);
-    setEditingAlertId(null);
+    try {
+      await updateAlert(editingAlertId, {
+        targetPrice: price,
+        type: alertType,
+        note: note || undefined,
+        emailNotification,
+        emailAddress: emailNotification ? emailAddress : undefined,
+        browserNotification,
+      });
+      setTargetPrice('');
+      setNote('');
+      setAlertType('above');
+      setEmailNotification(false);
+      setEmailAddress('');
+      setBrowserNotification(false);
+      setIsAddingAlert(false);
+      setEditingAlertId(null);
+    } catch (error: any) {
+      alert(`Failed to update alert: ${error.message || 'Unknown error'}`);
+    }
   };
 
   const handleCancel = () => {
@@ -441,7 +448,13 @@ export const PriceAlerts: React.FC<PriceAlertsProps> = ({ coin }) => {
                         </div>
                       </div>
                       <button
-                        onClick={() => toggleAlert(alert.id)}
+                        onClick={async () => {
+                          try {
+                            await toggleAlert(alert.id);
+                          } catch (error: any) {
+                            window.alert(`Failed to toggle alert: ${error.message || 'Unknown error'}`);
+                          }
+                        }}
                         className="ml-2 flex-shrink-0"
                         disabled={isTriggered}
                         aria-label={alert.isActive ? 'Disable alert' : 'Enable alert'}
@@ -513,9 +526,13 @@ export const PriceAlerts: React.FC<PriceAlertsProps> = ({ coin }) => {
                               <Edit2 className="h-3.5 w-3.5 text-gray-600" />
                             </button>
                             <button
-                              onClick={() => {
-                                if (confirm('Are you sure you want to delete this alert?')) {
-                                  removeAlert(alert.id);
+                              onClick={async () => {
+                                if (window.confirm('Are you sure you want to delete this alert?')) {
+                                  try {
+                                    await removeAlert(alert.id);
+                                  } catch (error: any) {
+                                    window.alert(`Failed to delete alert: ${error.message || 'Unknown error'}`);
+                                  }
                                 }
                               }}
                               className="p-1.5 hover:bg-red-50 rounded transition-colors"

@@ -1,11 +1,28 @@
 import { PriceAlert } from '@/lib/types';
-import { getCache } from '@/lib/cache/cache';
-import { fetchCoinsByIds } from '@/lib/api';
+import { prisma } from '@/lib/db';
 import { formatCurrency } from '@/lib/utils/currency';
 import { Currency } from '@/lib/store';
 
-const ALERTS_STORAGE_KEY = 'price-alerts:all';
-const ALERTS_TTL = 365 * 24 * 60 * 60; // 1 year TTL
+// Helper function to convert Prisma model to PriceAlert type
+function prismaToPriceAlert(prismaAlert: any): PriceAlert {
+  return {
+    id: prismaAlert.id,
+    coinId: prismaAlert.coinId,
+    coinName: prismaAlert.coinName,
+    coinSymbol: prismaAlert.coinSymbol,
+    coinImage: prismaAlert.coinImage,
+    targetPrice: prismaAlert.targetPrice,
+    type: prismaAlert.type as 'above' | 'below',
+    currency: prismaAlert.currency as PriceAlert['currency'],
+    isActive: prismaAlert.isActive,
+    createdAt: prismaAlert.createdAt,
+    triggeredAt: prismaAlert.triggeredAt ?? undefined,
+    note: prismaAlert.note ?? undefined,
+    emailNotification: prismaAlert.emailNotification ?? undefined,
+    emailAddress: prismaAlert.emailAddress ?? undefined,
+    browserNotification: prismaAlert.browserNotification ?? undefined,
+  };
+}
 
 interface AlertCheckResult {
   alertId: string;
@@ -37,20 +54,22 @@ interface WorkerStats {
  * - Marks alerts as triggered to prevent duplicate notifications
  */
 export class PriceAlertWorker {
-  private cache = getCache();
-
   /**
    * Get all active alerts that haven't been triggered
    */
   async getActiveAlerts(): Promise<PriceAlert[]> {
     try {
-      const allAlerts = (await this.cache.get<PriceAlert[]>(ALERTS_STORAGE_KEY, {
-        namespace: 'alerts',
-      })) || [];
+      const alerts = await prisma.priceAlert.findMany({
+        where: {
+          isActive: true,
+          triggeredAt: null,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
 
-      return allAlerts.filter(
-        alert => alert.isActive && !alert.triggeredAt
-      );
+      return alerts.map(prismaToPriceAlert);
     } catch (error) {
       console.error('Error fetching active alerts:', error);
       return [];
@@ -77,23 +96,13 @@ export class PriceAlertWorker {
    */
   async markAlertAsTriggered(alertId: string): Promise<void> {
     try {
-      const allAlerts = (await this.cache.get<PriceAlert[]>(ALERTS_STORAGE_KEY, {
-        namespace: 'alerts',
-      })) || [];
-
-      const alertIndex = allAlerts.findIndex(a => a.id === alertId);
-      if (alertIndex >= 0) {
-        allAlerts[alertIndex] = {
-          ...allAlerts[alertIndex],
+      await prisma.priceAlert.update({
+        where: { id: alertId },
+        data: {
           triggeredAt: Date.now(),
           isActive: false,
-        };
-
-        await this.cache.set(ALERTS_STORAGE_KEY, allAlerts, {
-          namespace: 'alerts',
-          ttl: ALERTS_TTL,
-        });
-      }
+        },
+      });
     } catch (error) {
       console.error(`Error marking alert ${alertId} as triggered:`, error);
     }
